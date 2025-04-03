@@ -39,10 +39,19 @@ function preload() {
 }
 
 function create() {
-  // Scaled parallax layers
-  bgLayer = this.add.tileSprite(0, 0, 896, 512, 'bgLayer').setOrigin(0, 0).setDisplaySize(896, 512);
-  midLayer = this.add.tileSprite(0, 0, 896, 512, 'midLayer').setOrigin(0, 0).setDisplaySize(896, 512).setAlpha(0.6);
-  fgLayer = this.add.tileSprite(0, 0, 896, 512, 'fgLayer').setOrigin(0, 0).setDisplaySize(896, 512).setAlpha(0.8);
+  // Background: STATIC (not tileSprite)
+  bgLayer = this.add.image(0, 0, 'bgLayer').setOrigin(0, 0).setDisplaySize(896, 512);
+
+  // Midground + Foreground: SCROLLING
+  midLayer = this.add.tileSprite(0, 0, 896, 512, 'midLayer')
+    .setOrigin(0, 0)
+    .setDisplaySize(896, 512)
+    .setAlpha(0.6);
+
+  fgLayer = this.add.tileSprite(0, 0, 896, 512, 'fgLayer')
+    .setOrigin(0, 0)
+    .setDisplaySize(896, 512)
+    .setAlpha(0.8);
 
   player = this.physics.add.sprite(100, 400, 'soldier');
   player.setScale(2).setCollideWorldBounds(true);
@@ -74,8 +83,7 @@ function create() {
 }
 
 function update(time) {
-  // Parallax scrolling speeds
-  bgLayer.tilePositionX += 0.3;
+  // Scroll only mid + fore layers
   midLayer.tilePositionX += 1;
   fgLayer.tilePositionX += 2;
 
