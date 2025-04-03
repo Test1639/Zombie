@@ -60,34 +60,27 @@
 
     let player, cursors, bullets, zombies;
     let health = 100, ammo = 6, maxAmmo = 6, score = 0;
-    let fireKey, reloadKey, lastFired = 0, reloadCooldown = false;
+    let fireKey, reloadKey, reloadCooldown = false;
     let healthBar, ammoText, scoreText;
     let fireBtn, reloadBtn;
 
     function preload() {
-      // Backgrounds
-      this.load.image('bg', 'background_layer.png');
-      this.load.image('mg', 'midground_layer.png');
-      this.load.image('fg', 'foreground_layer.png');
-
-      // Sprites
-      this.load.image('player', 'soldier.png');
-      this.load.image('zombie', 'zombie.png');
-      this.load.image('bullet', 'bullet.png');
+      this.load.image('bg', 'Zombie/assets/background_layer.png');
+      this.load.image('mg', 'Zombie/assets/midground_layer.png');
+      this.load.image('fg', 'Zombie/assets/foreground_layer.png');
+      this.load.image('player', 'Zombie/assets/soldier.png');
+      this.load.image('zombie', 'Zombie/assets/soldier.png');
+      this.load.image('bullet', 'Zombie/assets/bullet.png');
     }
 
     function create() {
-      // Background layers with fallback
       createBackgroundLayer.call(this, 'bg', '#2c3e50', 0.2);
       createBackgroundLayer.call(this, 'mg', '#34495e', 0.4);
       createBackgroundLayer.call(this, 'fg', '#7f8c8d', 0.6);
 
-      // Player
       player = this.physics.add.sprite(100, 256, 'player');
       player.setCollideWorldBounds(true);
-      player.health = health;
 
-      // Controls
       cursors = this.input.keyboard.createCursorKeys();
       fireKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
       reloadKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
@@ -97,24 +90,19 @@
       fireBtn.addEventListener('click', () => fireBullet.call(this));
       reloadBtn.addEventListener('click', () => reloadAmmo.call(this));
 
-      // Groups
       bullets = this.physics.add.group();
       zombies = this.physics.add.group();
 
-      // Collisions
       this.physics.add.overlap(bullets, zombies, hitZombie, null, this);
       this.physics.add.overlap(player, zombies, playerHit, null, this);
 
-      // UI
       ammoText = this.add.text(10, 10, 'Ammo: ' + ammo, { font: '20px Arial', fill: '#fff' });
       scoreText = this.add.text(10, 40, 'Score: ' + score, { font: '20px Arial', fill: '#fff' });
       healthBar = this.add.graphics();
       updateHealthBar();
 
-      // FPS Counter
       this.fpsText = this.add.text(800, 10, '', { font: '16px Courier', fill: '#00ff00' });
 
-      // Zombie Spawner
       this.time.addEvent({
         delay: 1000,
         callback: spawnZombie,
