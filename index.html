@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Endless Zombie Shooter</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial;
+            text-shadow: 2px 2px 4px black;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        KILLS: <span id="kills">0</span> | 
+        HEALTH: <span id="health">100</span>%
+    </div>
+    <script>
+        // Simple version that works on GitHub Pages
+        const canvas = document.createElement('canvas');
+        document.body.appendChild(canvas);
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas to full window size
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+        
+        // Game state
+        const player = { x: canvas.width/2, y: canvas.height/2, size: 20, health: 100 };
+        const zombies = [];
+        let kills = 0;
+        
+        // Create initial zombies
+        for (let i = 0; i < 5; i++) {
+            spawnZombie();
+        }
+        
+        function spawnZombie() {
+            zombies.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: 30,
+                speed: 1 + Math.random()
+            });
+        }
+        
+        // Game loop
+        function gameLoop() {
+            // Clear screen
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw player
+            ctx.fillStyle = 'blue';
+            ctx.fillRect(player.x - player.size/2, player.y - player.size/2, player.size, player.size);
+            
+            // Draw zombies
+            ctx.fillStyle = 'green';
+            zombies.forEach(z => {
+                ctx.fillRect(z.x - z.size/2, z.y - z.size/2, z.size, z.size);
+                
+                // Move toward player
+                const dx = player.x - z.x;
+                const dy = player.y - z.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                z.x += (dx/dist) * z.speed;
+                z.y += (dy/dist) * z.speed;
+                
+                // Check collision
+                if (dist < (player.size + z.size)/2) {
+                    player.health--;
+                    document.getElementById('health').textContent = player.health;
+                    
+                    if (player.health <= 0) {
+                        alert(`GAME OVER! Kills: ${kills}`);
+                        document.location.reload();
+                    }
+                }
+            });
+            
+            // Update UI
+            document.getElementById('kills').textContent = kills;
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Mouse controls
+        canvas.addEventListener('mousemove', (e) => {
+            player.x = e.clientX;
+            player.y = e.clientY;
+        });
+        
+        canvas.addEventListener('click', () => {
+            // Check for zombie hits
+            zombies.forEach((z, i) => {
+                const dx = player.x - z.x;
+                const dy = player.y - z.y;
+                if (Math.sqrt(dx*dx + dy*dy) < z.size) {
+                    zombies.splice(i, 1);
+                    kills++;
+                    spawnZombie();
+                }
+            });
+        });
+        
+        // Touch controls for mobile
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            player.x = e.touches[0].clientX;
+            player.y = e.touches[0].clientY;
+        }, { passive: false });
+        
+        canvas.addEventListener('touchend', () => {
+            // Same as click for shooting
+            zombies.forEach((z, i) => {
+                const dx = player.x - z.x;
+                const dy = player.y - z.y;
+                if (Math.sqrt(dx*dx + dy*dy) < z.size) {
+                    zombies.splice(i, 1);
+                    kills++;
+                    spawnZombie();
+                }
+            });
+        });
+        
+        // Start game
+        gameLoop();
+    </script>
+</body>
+</html>
