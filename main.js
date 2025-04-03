@@ -2,6 +2,9 @@ const config = {
   type: Phaser.AUTO,
   width: 896,
   height: 512,
+  render: {
+    pixelArt: true
+  },
   physics: {
     default: 'arcade',
     arcade: {
@@ -36,10 +39,10 @@ function preload() {
 }
 
 function create() {
-  // Parallax background
-  bgLayer = this.add.tileSprite(0, 0, 896, 512, 'bgLayer').setOrigin(0, 0);
-  midLayer = this.add.tileSprite(0, 0, 896, 512, 'midLayer').setOrigin(0, 0).setAlpha(0.6);
-  fgLayer = this.add.tileSprite(0, 0, 896, 512, 'fgLayer').setOrigin(0, 0).setAlpha(0.8);
+  // Scaled parallax layers
+  bgLayer = this.add.tileSprite(0, 0, 896, 512, 'bgLayer').setOrigin(0, 0).setDisplaySize(896, 512);
+  midLayer = this.add.tileSprite(0, 0, 896, 512, 'midLayer').setOrigin(0, 0).setDisplaySize(896, 512).setAlpha(0.6);
+  fgLayer = this.add.tileSprite(0, 0, 896, 512, 'fgLayer').setOrigin(0, 0).setDisplaySize(896, 512).setAlpha(0.8);
 
   player = this.physics.add.sprite(100, 400, 'soldier');
   player.setScale(2).setCollideWorldBounds(true);
@@ -71,7 +74,7 @@ function create() {
 }
 
 function update(time) {
-  // Parallax scroll speeds
+  // Parallax scrolling speeds
   bgLayer.tilePositionX += 0.3;
   midLayer.tilePositionX += 1;
   fgLayer.tilePositionX += 2;
