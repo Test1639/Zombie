@@ -1,120 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>3D Zombie Shooter</title>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        #info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            font-family: Arial;
-            background: rgba(0,0,0,0.5);
-            padding: 10px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zombie Rush: Eternal Patrol</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: black; }
+    canvas { display: block; margin: 0 auto; }
+  </style>
 </head>
 <body>
-    <div id="info">KILLS: <span id="kills">0</span> | HEALTH: <span id="health">100</span></div>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        // 1. SETUP 3D WORLD
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        // 2. ADD LIGHT
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 10, 5);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x404040));
-
-        // 3. CREATE PLAYER (Camera is the player)
-        camera.position.y = 1.6; // Eye level
-        const player = { health: 100, kills: 0 };
-
-        // 4. CREATE ZOMBIES
-        const zombies = [];
-        function createZombie() {
-            const geometry = new THREE.BoxGeometry(1, 2, 1);
-            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-            const zombie = new THREE.Mesh(geometry, material);
-            
-            // Random position around player
-            const angle = Math.random() * Math.PI * 2;
-            zombie.position.x = camera.position.x + Math.cos(angle) * 10;
-            zombie.position.z = camera.position.z + Math.sin(angle) * 10;
-            
-            scene.add(zombie);
-            zombies.push(zombie);
-        }
-
-        // Create 5 zombies to start
-        for (let i = 0; i < 5; i++) createZombie();
-
-        // 5. SHOOTING MECHANIC
-        document.onclick = function() {
-            // Create a line (bullet) from camera
-            const raycaster = new THREE.Raycaster(
-                camera.position,
-                camera.getWorldDirection(new THREE.Vector3())
-            );
-            
-            // Check if bullet hits zombie
-            const intersects = raycaster.intersectObjects(zombies);
-            if (intersects.length > 0) {
-                const zombie = intersects[0].object;
-                scene.remove(zombie);
-                zombies.splice(zombies.indexOf(zombie), 1);
-                player.kills++;
-                document.getElementById('kills').textContent = player.kills;
-                createZombie(); // Spawn new zombie
-            }
-        };
-
-        // 6. GAME LOOP
-        function gameLoop() {
-            requestAnimationFrame(gameLoop);
-            
-            // Make zombies follow player
-            zombies.forEach(zombie => {
-                zombie.lookAt(camera.position);
-                zombie.translateZ(0.05);
-                
-                // Check if zombie touches player
-                if (zombie.position.distanceTo(camera.position) < 1.5) {
-                    player.health--;
-                    document.getElementById('health').textContent = player.health;
-                    if (player.health <= 0) alert("GAME OVER!");
-                }
-            });
-            
-            renderer.render(scene, camera);
-        }
-        gameLoop();
-
-        // 7. MOUSE LOOK (For desktop)
-        let mouseX = 0, mouseY = 0;
-        document.onmousemove = function(e) {
-            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
-            camera.rotation.y = mouseX * 2;
-            camera.rotation.x = mouseY * 1;
-        };
-
-        // 8. MOBILE TOUCH CONTROLS
-        document.ontouchmove = function(e) {
-            e.preventDefault();
-            mouseX = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
-            mouseY = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
-            camera.rotation.y = mouseX * 2;
-            camera.rotation.x = mouseY * 1;
-        };
-        document.ontouchend = function() { document.onclick(); }; // Tap to shoot
-    </script>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
