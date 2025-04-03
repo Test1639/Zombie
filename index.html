@@ -6,9 +6,11 @@
   <title>Zombie Shooter 2D</title>
   <style>
     html, body {
-      margin: 0; padding: 0;
+      margin: 0;
+      padding: 0;
       overflow: hidden;
-      width: 100%; height: 100%;
+      width: 100vw;
+      height: 100vh;
       background: black;
       touch-action: none;
     }
@@ -36,13 +38,25 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js"></script>
   <script>
+    const gameWidth = 896;
+    const gameHeight = 512;
+
     const config = {
       type: Phaser.AUTO,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+      width: gameWidth,
+      height: gameHeight,
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+      },
+      physics: {
+        default: 'arcade',
+        arcade: {
+          gravity: { y: 0 },
+          debug: false
+        }
+      },
       pixelArt: true,
-      physics: { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
       backgroundColor: '#000000',
       scene: { preload, create, update }
     };
@@ -61,19 +75,20 @@
       this.load.image('mg', 'assets/midground_layer.png');
       this.load.image('fg', 'assets/foreground_layer.png');
       this.load.image('player', 'assets/soldier.png');
-      this.load.image('zombie', 'assets/zombie.png'); // must be in your assets folder!
+      this.load.image('zombie', 'assets/zombie.png');
       this.load.image('bullet', 'assets/bullet.png');
       this.load.image('healthPack', 'assets/healthPack.png');
       this.load.image('ammoBox', 'assets/ammoBox.png');
     }
 
     function create() {
-      this.add.tileSprite(0, 0, config.width, config.height, 'bg').setOrigin(0).setScrollFactor(0.2);
-      this.add.tileSprite(0, 0, config.width, config.height, 'mg').setOrigin(0).setScrollFactor(0.4);
-      this.add.tileSprite(0, 0, config.width, config.height, 'fg').setOrigin(0).setScrollFactor(0.6);
+      this.add.image(0, 0, 'bg').setOrigin(0).setDisplaySize(gameWidth, gameHeight);
+      this.add.image(0, 0, 'mg').setOrigin(0).setDisplaySize(gameWidth, gameHeight);
+      this.add.image(0, 0, 'fg').setOrigin(0).setDisplaySize(gameWidth, gameHeight);
 
-      player = this.physics.add.sprite(config.width / 2, config.height / 2, 'player');
-      player.setScale(0.5).setCollideWorldBounds(true);
+      player = this.physics.add.sprite(150, gameHeight - 100, 'player');
+      player.setScale(0.35);
+      player.setCollideWorldBounds(true);
 
       bullets = this.physics.add.group();
       zombies = this.physics.add.group();
@@ -91,29 +106,11 @@
       updateHealthBar();
 
       this.time.addEvent({
-        delay: 1000,
+        delay: 1500,
         callback: () => {
-          const z = zombies.create(config.width + 50, Phaser.Math.Between(50, config.height - 50), 'zombie');
-          z.setVelocityX(Phaser.Math.Between(-80, -140));
-          z.setScale(0.5);
-        },
-        loop: true
-      });
-
-      this.time.addEvent({
-        delay: 8000,
-        callback: () => {
-          const pack = healthPacks.create(config.width + 10, Phaser.Math.Between(50, config.height - 50), 'healthPack');
-          pack.setVelocityX(-100).setScale(0.5);
-        },
-        loop: true
-      });
-
-      this.time.addEvent({
-        delay: 6000,
-        callback: () => {
-          const ammo = ammoBoxes.create(config.width + 10, Phaser.Math.Between(50, config.height - 50), 'ammoBox');
-          ammo.setVelocityX(-100).setScale(0.5);
+          const z = zombies.create(gameWidth + 50, gameHeight - 100, 'zombie');
+          z.setVelocityX(-100);
+          z.setScale(0.35);
         },
         loop: true
       });
@@ -122,7 +119,7 @@
     }
 
     function update(time) {
-      if (player && moveVelocity) player.setVelocity(moveVelocity.x * 200, moveVelocity.y * 200);
+      if (player) player.setVelocity(moveVelocity.x * 200, moveVelocity.y * 200);
       if (aimAngle !== null && time > lastFired + 300 && ammo > 0) {
         fireBullet(aimAngle); lastFired = time;
       }
