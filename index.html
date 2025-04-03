@@ -10,6 +10,7 @@
       padding: 0;
       background: black;
       overflow: hidden;
+      touch-action: manipulation;
     }
 
     canvas {
@@ -20,52 +21,57 @@
 
     #mobile-controls {
       position: fixed;
-      bottom: 10px;
+      bottom: 20px;
       width: 100%;
       display: flex;
-      justify-content: space-between;
+      justify-content: space-around;
       z-index: 100;
       padding: 0 20px;
       box-sizing: border-box;
     }
 
-    #shoot-btn {
+    .mobile-btn {
       width: 80px;
       height: 80px;
-      background: rgba(255, 0, 0, 0.6);
       border-radius: 50%;
       color: white;
       font-weight: bold;
       font-size: 18px;
-      text-align: center;
-      line-height: 80px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
 
+    #shoot-btn {
+      background: rgba(255, 0, 0, 0.6);
+    }
+
     #reload-btn {
-      width: 80px;
-      height: 80px;
       background: rgba(0, 150, 255, 0.6);
-      border-radius: 50%;
+    }
+
+    #debug-overlay {
+      position: fixed;
+      top: 10px;
+      right: 10px;
       color: white;
-      font-weight: bold;
-      font-size: 18px;
-      text-align: center;
-      line-height: 80px;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
+      font-family: monospace;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
   <!-- Mobile controls -->
   <div id="mobile-controls">
-    <div id="reload-btn">RELOAD</div>
-    <div id="shoot-btn">FIRE</div>
+    <div id="reload-btn" class="mobile-btn">RELOAD</div>
+    <div id="shoot-btn" class="mobile-btn">FIRE</div>
   </div>
+
+  <!-- Debug overlay -->
+  <div id="debug-overlay"></div>
 
   <!-- Load Phaser -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
@@ -95,13 +101,14 @@
 
     const game = new Phaser.Game(config);
 
+    // Game variables
     let player, bullets, zombies, bg, mid, fg;
     let ammo = 6, score = 0, health = 100, reloading = false;
     let scoreText, ammoText, reloadText, healthBar;
     let zombieTimer = 0;
+    let debugOverlay;
 
     function preload() {
-      // Placeholder assets - replace with your actual asset paths
       this.load.setPath('assets/');
       this.load.image('bg', 'background_layer.png');
       this.load.image('mid', 'midground_layer.png');
@@ -109,125 +116,37 @@
       this.load.image('soldier', 'soldier.png');
       this.load.image('zombie', 'zombie.png');
       this.load.image('bullet', 'bullet.png');
-      
-      // Fallback if assets don't load
-      this.load.on('loaderror', () => {
-        console.warn('Asset failed to load, using fallback colors');
-        this.textures.addDynamicTexture('bg', { width: 896, height: 512 });
-        this.textures.addDynamicTexture('mid', { width: 896, height: 512 });
-        this.textures.addDynamicTexture('fg', { width: 896, height: 512 });
-        this.textures.addDynamicTexture('soldier', { width: 32, height: 32 });
-        this.textures.addDynamicTexture('zombie', { width: 32, height: 32 });
-        this.textures.addDynamicTexture('bullet', { width: 8, height: 8 });
+
+      // Fallback system
+      this.load.on('loaderror', (file) => {
+        console.warn(`Failed to load: ${file.key}`);
+        const colors = {
+          soldier: '#3498db',
+          zombie: '#e74c3c',
+          bullet: '#f1c40f',
+          bg: '#2c3e50',
+          mid: '#34495e',
+          fg: '#7f8c8d'
+        };
+
+        const makeTex = (name, color) => {
+          const tex = this.textures.createCanvas(name, 32, 32);
+          tex.context.fillStyle = color;
+          tex.context.fillRect(0, 0, 32, 32);
+          tex.refresh();
+        };
+
+        if (!this.textures.exists(file.key) && colors[file.key]) {
+          makeTex(file.key, colors[file.key]);
+        }
       });
     }
 
     function create() {
-      // Parallax layers
+      // Debug overlay
+      debugOverlay = document.getElementById('debug-overlay');
+
+      // Background layers
       bg = this.add.image(0, 0, 'bg').setOrigin(0).setDisplaySize(896, 512);
       mid = this.add.tileSprite(0, 0, 896, 512, 'mid').setOrigin(0).setDisplaySize(896, 512).setAlpha(0.6);
-      fg = this.add.tileSprite(0, 0, 896, 512, 'fg').setOrigin(0).setDisplaySize(896, 512).setAlpha(0.8);
-
-      player = this.physics.add.sprite(100, 400, 'soldier').setScale(2).setCollideWorldBounds(true);
-
-      bullets = this.physics.add.group();
-      zombies = this.physics.add.group();
-
-      this.physics.add.overlap(bullets, zombies, (bullet, zombie) => {
-        bullet.destroy();
-        zombie.destroy();
-        score += 10;
-        scoreText.setText(`Score: ${score}`);
-      });
-
-      this.physics.add.overlap(player, zombies, () => {
-        health -= 20;
-        updateHealthBar();
-      });
-
-      // UI
-      scoreText = this.add.text(10, 10, 'Score: 0', { fontSize: '18px', fill: '#fff' });
-      ammoText = this.add.text(10, 30, 'Ammo: 6', { fontSize: '18px', fill: '#fff' });
-      reloadText = this.add.text(10, 50, '', { fontSize: '16px', fill: '#ff0' });
-      healthBar = this.add.graphics();
-      updateHealthBar();
-
-      // Shoot input
-      this.input.on('pointerdown', () => {
-        if (reloading || ammo <= 0) return;
-        fireBullet(this);
-      });
-
-      // Keyboard controls
-      this.input.keyboard.on('keydown-SPACE', () => {
-        if (reloading || ammo <= 0) return;
-        fireBullet(this);
-      });
-
-      this.input.keyboard.on('keydown-R', () => {
-        if (!reloading && ammo < 6) {
-          startReload(this);
-        }
-      });
-
-      // Mobile controls
-      document.getElementById('shoot-btn').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (reloading || ammo <= 0) return;
-        fireBullet(this);
-      });
-
-      document.getElementById('reload-btn').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (!reloading && ammo < 6) {
-          startReload(this);
-        }
-      });
-    }
-
-    function update(time) {
-      mid.tilePositionX += 0.5;
-      fg.tilePositionX += 1;
-
-      if (time > zombieTimer) {
-        const yPos = Phaser.Math.Between(100, 400);
-        let zombie = zombies.create(896, yPos, 'zombie').setVelocityX(-100).setScale(2);
-        zombieTimer = time + Phaser.Math.Between(1000, 3000);
-      }
-
-      if (health <= 0) {
-        this.scene.restart();
-        health = 100;
-        ammo = 6;
-        score = 0;
-        reloading = false;
-      }
-    }
-
-    function fireBullet(scene) {
-      const bullet = bullets.create(player.x + 40, player.y, 'bullet');
-      bullet.setVelocityX(400).setScale(2);
-      ammo--;
-      ammoText.setText(`Ammo: ${ammo}`);
-      if (ammo === 0) startReload(scene);
-    }
-
-    function updateHealthBar() {
-      healthBar.clear();
-      healthBar.fillStyle(0xff0000).fillRect(10, 80, 100, 10);
-      healthBar.fillStyle(0x00ff00).fillRect(10, 80, Math.max(0, health), 10);
-    }
-
-    function startReload(scene) {
-      reloading = true;
-      reloadText.setText('Reloading...');
-      scene.time.delayedCall(1000, () => {
-        ammo = 6;
-        ammoText.setText(`Ammo: ${ammo}`);
-        reloadText.setText('');
-        reloading = false;
-      });
-    }
-  </script>
-</body>
-</html>
+      fg = this.add.tileSprite(0, 0, 896, 512, 'fg').setOrigin(0).setDisplaySize(896, 512).setAlpha(0.8
