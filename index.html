@@ -69,7 +69,7 @@
       this.load.image('mg', 'assets/midground_layer.png');
       this.load.image('fg', 'assets/foreground_layer.png');
       this.load.image('player', 'assets/soldier.png');
-      this.load.image('zombie', 'assets/soldier.png');
+      this.load.image('zombie', 'assets/soldier.png'); // Replace with zombie.png when available
       this.load.image('bullet', 'assets/bullet.png');
     }
 
@@ -80,6 +80,8 @@
 
       player = this.physics.add.sprite(100, 256, 'player');
       player.setCollideWorldBounds(true);
+      player.setOrigin(0.5, 0.5);
+      player.setScale(0.5); // Fixes oversized sprite
 
       cursors = this.input.keyboard.createCursorKeys();
       fireKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -147,6 +149,8 @@
     function spawnZombie() {
       const zombie = zombies.create(896, Phaser.Math.Between(50, 462), 'zombie');
       zombie.setVelocityX(Phaser.Math.Between(-100, -150));
+      zombie.setScale(0.5); // Match soldier size
+      zombie.setOrigin(0.5, 0.5);
     }
 
     function hitZombie(bullet, zombie) {
