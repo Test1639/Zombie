@@ -18,19 +18,16 @@ const config = {
 
 const game = new Phaser.Game(config);
 
-let player, background, zombies, bullets, zombieTimer = 0;
-let score = 0;
-let scoreText;
-let health = 100;
-let healthBar;
-let ammo = 6;
-let ammoText;
-let reloading = false;
-let reloadText;
-let powerUps;
+let player, bullets, zombies, powerUps;
+let bgLayer, midLayer, fgLayer;
+let score = 0, health = 100, ammo = 6, reloading = false;
+let zombieTimer = 0;
+let scoreText, ammoText, reloadText, healthBar;
 
 function preload() {
-  this.load.image('bg', 'assets/background.png');
+  this.load.image('bgLayer', 'assets/background_layer.png');
+  this.load.image('midLayer', 'assets/midground_layer.png');
+  this.load.image('fgLayer', 'assets/foreground_layer.png');
   this.load.image('soldier', 'assets/soldier.png');
   this.load.image('zombie', 'assets/zombie.png');
   this.load.image('bullet', 'assets/bullet.png');
@@ -39,11 +36,13 @@ function preload() {
 }
 
 function create() {
-  background = this.add.tileSprite(0, 0, 896, 512, 'bg').setOrigin(0, 0);
+  // Parallax background
+  bgLayer = this.add.tileSprite(0, 0, 896, 512, 'bgLayer').setOrigin(0, 0);
+  midLayer = this.add.tileSprite(0, 0, 896, 512, 'midLayer').setOrigin(0, 0).setAlpha(0.6);
+  fgLayer = this.add.tileSprite(0, 0, 896, 512, 'fgLayer').setOrigin(0, 0).setAlpha(0.8);
 
   player = this.physics.add.sprite(100, 400, 'soldier');
-  player.setScale(2);
-  player.setCollideWorldBounds(true);
+  player.setScale(2).setCollideWorldBounds(true);
 
   zombies = this.physics.add.group();
   bullets = this.physics.add.group();
@@ -67,27 +66,25 @@ function create() {
     bullet.setScale(2);
     ammo--;
     ammoText.setText('Ammo: ' + ammo);
-    if (ammo === 0) {
-      startReload(this);
-    }
+    if (ammo === 0) startReload(this);
   });
 }
 
-function update(time, delta) {
-  background.tilePositionX += 2;
+function update(time) {
+  // Parallax scroll speeds
+  bgLayer.tilePositionX += 0.3;
+  midLayer.tilePositionX += 1;
+  fgLayer.tilePositionX += 2;
 
   if (time > zombieTimer) {
     let zombie = zombies.create(896, 400, 'zombie');
-    zombie.setVelocityX(-100);
-    zombie.setScale(2);
+    zombie.setVelocityX(-100).setScale(2);
     zombieTimer = time + 1500;
 
-    // 20% chance to drop a power-up
     if (Math.random() < 0.2) {
       let type = Math.random() < 0.5 ? 'healthPack' : 'ammoBox';
       let powerUp = powerUps.create(896, 400, type);
-      powerUp.setVelocityX(-100);
-      powerUp.setScale(1.5);
+      powerUp.setVelocityX(-100).setScale(1.5);
       powerUp.type = type;
     }
   }
@@ -98,16 +95,12 @@ function update(time, delta) {
 
   if (health <= 0) {
     this.scene.restart();
-    score = 0;
-    health = 100;
-    ammo = 6;
-    reloading = false;
+    score = 0; health = 100; ammo = 6; reloading = false;
   }
 }
 
 function killZombie(bullet, zombie) {
-  bullet.destroy();
-  zombie.destroy();
+  bullet.destroy(); zombie.destroy();
   score += 10;
   scoreText.setText('Score: ' + score);
 }
