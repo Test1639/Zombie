@@ -1,526 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Endless Zombie Shooter</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-            touch-action: none;
-        }
-        #ui {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            color: white;
-            text-shadow: 1px 1px 2px black;
-            z-index: 100;
-        }
-        #ammo {
-            position: fixed;
-            bottom: 60px;
-            right: 10px;
-            color: white;
-            text-shadow: 1px 1px 2px black;
-            z-index: 100;
-        }
-        #health {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            color: white;
-            text-shadow: 1px 1px 2px black;
-            z-index: 100;
-        }
-        #mobile-controls {
-            position: fixed;
-            bottom: 10px;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            z-index: 100;
-        }
-        .joystick {
-            width: 100px;
-            height: 100px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        #shoot-btn {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 0, 0, 0.5);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-size: 24px;
-        }
-        #game-over {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            z-index: 200;
-        }
-        #restart-btn {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background: #ff0000;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 18px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Endless Zombie Shooter 2D</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+    }
+
+    #mobile-controls {
+      position: fixed;
+      bottom: 10px;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      z-index: 100;
+    }
+
+    #shoot-btn {
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 0, 0, 0.6);
+      border-radius: 50%;
+      color: white;
+      font-weight: bold;
+      font-size: 18px;
+      text-align: center;
+      line-height: 80px;
+    }
+  </style>
 </head>
 <body>
-    <div id="ui">
-        <div>Kills: <span id="kills">0</span></div>
-        <div>Wave: <span id="wave">1</span></div>
-    </div>
-    <div id="health">
-        Health: <span id="health-value">100</span>%
-    </div>
-    <div id="ammo">
-        Ammo: <span id="ammo-value">30</span>/<span id="ammo-max">90</span>
-    </div>
-    
-    <div id="mobile-controls">
-        <div id="move-joystick" class="joystick"></div>
-        <div id="shoot-btn">FIRE</div>
-    </div>
-    
-    <div id="game-over">
-        <h1>GAME OVER</h1>
-        <p>You killed <span id="final-kills">0</span> zombies</p>
-        <p>Survived <span id="final-wave">0</span> waves</p>
-        <button id="restart-btn">RESTART</button>
-    </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.7.1/gsap.min.js"></script>
-    <script>
-        // Game constants
-        const WORLD_SIZE = 1000;
-        const ZOMBIE_SPAWN_DISTANCE = 30;
-        const PLAYER_SPEED = 0.2;
-        const ZOMBIE_SPEED = 0.1;
-        const ZOMBIE_DAMAGE = 10;
-        const ZOMBIE_HEALTH = 100;
-        const BULLET_DAMAGE = 25;
-        const BULLET_SPEED = 1;
-        const RELOAD_TIME = 1000;
-        const WAVE_TIME = 30000; // 30 seconds
-        
-        // Game variables
-        let scene, camera, renderer;
-        let player, zombies = [], bullets = [];
-        let world, ground;
-        let moveDirection = { x: 0, z: 0 };
-        let playerHealth = 100;
-        let ammo = 30;
-        let maxAmmo = 90;
-        let isReloading = false;
-        let kills = 0;
-        let wave = 1;
-        let zombiesInWave = 5;
-        let gameOver = false;
-        let lastWaveTime = Date.now();
-        
-        // Mobile controls
-        let moveJoystickActive = false;
-        let moveJoystickPosition = { x: 0, y: 0 };
-        let moveJoystickCenter = { x: 0, y: 0 };
-        
-        // Initialize the game
-        init();
-        
-        function init() {
-            // Reset game state
-            playerHealth = 100;
-            ammo = 30;
-            maxAmmo = 90;
-            kills = 0;
-            wave = 1;
-            zombiesInWave = 5;
-            gameOver = false;
-            lastWaveTime = Date.now();
-            
-            // Clear previous game if exists
-            if (renderer) {
-                document.body.removeChild(renderer.domElement);
-                while (scene && scene.children.length > 0) {
-                    scene.remove(scene.children[0]);
-                }
-            }
-            
-            // Create scene
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x333333);
-            
-            // Create camera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.y = 2;
-            
-            // Create renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-            
-            // Create world
-            createWorld();
-            
-            // Create player
-            createPlayer();
-            
-            // Create initial zombies
-            spawnZombies(zombiesInWave);
-            
-            // Setup controls
-            setupControls();
-            
-            // Update UI
-            updateUI();
-            
-            // Hide game over screen
-            document.getElementById('game-over').style.display = 'none';
-            
-            // Start game loop
-            animate();
-        }
-        
-        function createWorld() {
-            // Ground
-            const groundGeometry = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE);
-            const groundMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x228B22,
-                roughness: 0.8
-            });
-            ground = new THREE.Mesh(groundGeometry, groundMaterial);
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            scene.add(ground);
-            
-            // Ambient light
-            const ambientLight = new THREE.AmbientLight(0x404040);
-            scene.add(ambientLight);
-            
-            // Directional light (sun)
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(1, 1, 1);
-            directionalLight.castShadow = true;
-            directionalLight.shadow.mapSize.width = 1024;
-            directionalLight.shadow.mapSize.height = 1024;
-            scene.add(directionalLight);
-            
-            // Fog
-            scene.fog = new THREE.FogExp2(0x333333, 0.002);
-        }
-        
-        function createPlayer() {
-            // Player is just the camera in this case
-            // We'll add a gun model or crosshair later
-        }
-        
-        function spawnZombies(count) {
-            for (let i = 0; i < count; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const distance = ZOMBIE_SPAWN_DISTANCE + Math.random() * 10;
-                
-                const x = camera.position.x + Math.cos(angle) * distance;
-                const z = camera.position.z + Math.sin(angle) * distance;
-                
-                createZombie(x, z);
-            }
-        }
-        
-        function createZombie(x, z) {
-            const zombieGeometry = new THREE.BoxGeometry(1, 2, 1);
-            const zombieMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x00aa00,
-                roughness: 0.7
-            });
-            const zombie = new THREE.Mesh(zombieGeometry, zombieMaterial);
-            zombie.position.set(x, 1, z);
-            zombie.health = ZOMBIE_HEALTH;
-            scene.add(zombie);
-            zombies.push(zombie);
-        }
-        
-        function setupControls() {
-            // Keyboard controls
-            document.addEventListener('keydown', (e) => {
-                switch(e.key) {
-                    case 'w': case 'ArrowUp': moveDirection.z = -1; break;
-                    case 's': case 'ArrowDown': moveDirection.z = 1; break;
-                    case 'a': case 'ArrowLeft': moveDirection.x = -1; break;
-                    case 'd': case 'ArrowRight': moveDirection.x = 1; break;
-                    case ' ': shoot(); break;
-                    case 'r': reload(); break;
-                }
-            });
-            
-            document.addEventListener('keyup', (e) => {
-                switch(e.key) {
-                    case 'w': case 'ArrowUp': if (moveDirection.z === -1) moveDirection.z = 0; break;
-                    case 's': case 'ArrowDown': if (moveDirection.z === 1) moveDirection.z = 0; break;
-                    case 'a': case 'ArrowLeft': if (moveDirection.x === -1) moveDirection.x = 0; break;
-                    case 'd': case 'ArrowRight': if (moveDirection.x === 1) moveDirection.x = 0; break;
-                }
-            });
-            
-            // Mouse controls
-            document.addEventListener('mousedown', (e) => {
-                if (e.button === 0) { // Left click
-                    shoot();
-                }
-            });
-            
-            // Touch controls
-            const moveJoystick = document.getElementById('move-joystick');
-            const shootBtn = document.getElementById('shoot-btn');
-            
-            moveJoystick.addEventListener('touchstart', handleJoystickStart);
-            moveJoystick.addEventListener('touchmove', handleJoystickMove);
-            moveJoystick.addEventListener('touchend', handleJoystickEnd);
-            
-            shootBtn.addEventListener('touchstart', () => shoot());
-            shootBtn.addEventListener('touchend', (e) => e.preventDefault());
-            
-            // Restart button
-            document.getElementById('restart-btn').addEventListener('click', init);
-        }
-        
-        function handleJoystickStart(e) {
-            e.preventDefault();
-            moveJoystickActive = true;
-            const rect = e.target.getBoundingClientRect();
-            moveJoystickCenter = {
-                x: rect.left + rect.width / 2,
-                y: rect.top + rect.height / 2
-            };
-            moveJoystickPosition = {
-                x: e.touches[0].clientX,
-                y: e.touches[0].clientY
-            };
-        }
-        
-        function handleJoystickMove(e) {
-            e.preventDefault();
-            if (moveJoystickActive) {
-                moveJoystickPosition = {
-                    x: e.touches[0].clientX,
-                    y: e.touches[0].clientY
-                };
-                
-                const dx = moveJoystickPosition.x - moveJoystickCenter.x;
-                const dy = moveJoystickPosition.y - moveJoystickCenter.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const maxDistance = 50;
-                
-                if (distance > maxDistance) {
-                    const angle = Math.atan2(dy, dx);
-                    moveJoystickPosition = {
-                        x: moveJoystickCenter.x + Math.cos(angle) * maxDistance,
-                        y: moveJoystickCenter.y + Math.sin(angle) * maxDistance
-                    };
-                }
-                
-                // Update movement direction
-                const normalizedX = (moveJoystickPosition.x - moveJoystickCenter.x) / maxDistance;
-                const normalizedY = (moveJoystickPosition.y - moveJoystickCenter.y) / maxDistance;
-                
-                moveDirection = {
-                    x: normalizedX,
-                    z: normalizedY
-                };
-            }
-        }
-        
-        function handleJoystickEnd(e) {
-            e.preventDefault();
-            moveJoystickActive = false;
-            moveDirection = { x: 0, z: 0 };
-        }
-        
-        function shoot() {
-            if (gameOver || isReloading) return;
-            
-            if (ammo <= 0) {
-                reload();
-                return;
-            }
-            
-            ammo--;
-            updateUI();
-            
-            // Create bullet
-            const bullet = {
-                position: new THREE.Vector3().copy(camera.position),
-                direction: new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion),
-                distance: 0
-            };
-            bullets.push(bullet);
-            
-            // Check for hits
-            checkBulletHit(bullet);
-            
-            // Reload if out of ammo
-            if (ammo <= 0) {
-                reload();
-            }
-        }
-        
-        function checkBulletHit(bullet) {
-            const bulletEnd = new THREE.Vector3().copy(bullet.position).add(
-                new THREE.Vector3().copy(bullet.direction).multiplyScalar(50)
-            );
-            
-            const raycaster = new THREE.Raycaster(bullet.position, bullet.direction);
-            const intersects = raycaster.intersectObjects(zombies);
-            
-            if (intersects.length > 0) {
-                const zombie = intersects[0].object;
-                zombie.health -= BULLET_DAMAGE;
-                
-                if (zombie.health <= 0) {
-                    // Zombie killed
-                    scene.remove(zombie);
-                    zombies = zombies.filter(z => z !== zombie);
-                    kills++;
-                    updateUI();
-                    
-                    // Spawn new zombie if below wave count
-                    if (zombies.length < zombiesInWave) {
-                        spawnZombies(1);
-                    }
-                }
-            }
-        }
-        
-        function reload() {
-            if (isReloading || ammo >= 30 || maxAmmo <= 0) return;
-            
-            isReloading = true;
-            
-            const ammoToAdd = Math.min(30 - ammo, maxAmmo);
-            maxAmmo -= ammoToAdd;
-            
-            setTimeout(() => {
-                ammo += ammoToAdd;
-                isReloading = false;
-                updateUI();
-            }, RELOAD_TIME);
-        }
-        
-        function updateUI() {
-            document.getElementById('kills').textContent = kills;
-            document.getElementById('wave').textContent = wave;
-            document.getElementById('health-value').textContent = playerHealth;
-            document.getElementById('ammo-value').textContent = ammo;
-            document.getElementById('ammo-max').textContent = maxAmmo;
-        }
-        
-        function checkWave() {
-            const currentTime = Date.now();
-            if (currentTime - lastWaveTime > WAVE_TIME) {
-                wave++;
-                zombiesInWave = Math.floor(5 + wave * 1.5);
-                spawnZombies(zombiesInWave - zombies.length);
-                lastWaveTime = currentTime;
-                updateUI();
-            }
-        }
-        
-        function animate() {
-            if (gameOver) return;
-            
-            requestAnimationFrame(animate);
-            
-            // Move player
-            if (moveDirection.x !== 0 || moveDirection.z !== 0) {
-                const moveX = moveDirection.x * PLAYER_SPEED;
-                const moveZ = moveDirection.z * PLAYER_SPEED;
-                
-                camera.position.x += moveX;
-                camera.position.z += moveZ;
-                
-                // Keep player within world bounds (or wrap around for endless world)
-                if (camera.position.x < -WORLD_SIZE/2) camera.position.x = WORLD_SIZE/2;
-                if (camera.position.x > WORLD_SIZE/2) camera.position.x = -WORLD_SIZE/2;
-                if (camera.position.z < -WORLD_SIZE/2) camera.position.z = WORLD_SIZE/2;
-                if (camera.position.z > WORLD_SIZE/2) camera.position.z = -WORLD_SIZE/2;
-            }
-            
-            // Move zombies
-            zombies.forEach(zombie => {
-                const dx = camera.position.x - zombie.position.x;
-                const dz = camera.position.z - zombie.position.z;
-                const distance = Math.sqrt(dx * dx + dz * dz);
-                
-                if (distance > 0) {
-                    zombie.position.x += (dx / distance) * ZOMBIE_SPEED;
-                    zombie.position.z += (dz / distance) * ZOMBIE_SPEED;
-                    zombie.lookAt(camera.position);
-                    
-                    // Check if zombie is close enough to attack
-                    if (distance < 2) {
-                        playerHealth -= ZOMBIE_DAMAGE * 0.016; // Roughly 60fps
-                        updateUI();
-                        
-                        if (playerHealth <= 0) {
-                            playerHealth = 0;
-                            gameOver = true;
-                            endGame();
-                        }
-                    }
-                }
-            });
-            
-            // Move bullets
-            bullets.forEach(bullet => {
-                bullet.position.add(new THREE.Vector3().copy(bullet.direction).multiplyScalar(BULLET_SPEED));
-                bullet.distance += BULLET_SPEED;
-            });
-            
-            // Remove bullets that are too far
-            bullets = bullets.filter(bullet => bullet.distance < 100);
-            
-            // Check wave progression
-            checkWave();
-            
-            // Render scene
-            renderer.render(scene, camera);
-        }
-        
-        function endGame() {
-            gameOver = true;
-            document.getElementById('final-kills').textContent = kills;
-            document.getElementById('final-wave').textContent = wave;
-            document.getElementById('game-over').style.display = 'flex';
-        }
-        
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
+  <!-- Optional mobile fire button -->
+  <div id="mobile-controls">
+    <div></div>
+    <div id="shoot-btn">FIRE</div>
+  </div>
+
+  <!-- Load Phaser -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+
+  <!-- Load the main game -->
+  <script src="main.js"></script>
+
+  <script>
+    // Optional mobile firing logic
+    document.getElementById('shoot-btn').addEventListener('touchstart', () => {
+      window.dispatchEvent(new Event('pointerdown'));
+    });
+  </script>
+
 </body>
 </html>
