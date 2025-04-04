@@ -1,8 +1,8 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter - Gun Locked</title>
+  <title>2.5D Shooter - Gun Animation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -54,6 +54,17 @@
     const fireDelay = 300;
     const bulletGeo = new THREE.SphereGeometry(bulletSize, 8, 8);
     const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+
+    const hudGun = document.getElementById("hud-gun");
+
+    const gunFrames = [
+      "assets/images/frame1.png",
+      "assets/images/frame2.png",
+      "assets/images/frame3.png",
+      "assets/images/frame4.png",
+      "assets/images/frame5.png",
+      "assets/images/frame6.png"
+    ];
 
     init();
     animate();
@@ -138,8 +149,6 @@
       lastShotTime = now;
 
       const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-
-      // Correct muzzle offset for pistol
       const muzzleOffset = new THREE.Vector3(0, -0.15, -0.5).applyQuaternion(camera.quaternion);
       bullet.position.copy(camera.position).add(muzzleOffset);
 
@@ -148,6 +157,21 @@
 
       bullets.push(bullet);
       scene.add(bullet);
+
+      playGunAnimation();
+    }
+
+    function playGunAnimation() {
+      let index = 0;
+      const interval = setInterval(() => {
+        if (index < gunFrames.length) {
+          hudGun.src = gunFrames[index];
+          index++;
+        } else {
+          clearInterval(interval);
+          hudGun.src = "assets/images/gun.png"; // reset to idle
+        }
+      }, 60); // Adjust timing as needed
     }
 
     function updateBullets() {
