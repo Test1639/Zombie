@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter with Gun Animation</title>
+  <title>2.5D Shooter with Joysticks & Gun Animation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -131,8 +131,10 @@
         if (e.key === 'd') controls.right = false;
       });
 
+      // Joystick movement
       let leftStart = null;
       let rightStart = null;
+
       const leftJoy = document.getElementById("leftJoystick");
       const rightJoy = document.getElementById("rightJoystick");
 
@@ -144,6 +146,7 @@
         const touch = e.touches[0];
         const dx = touch.clientX - leftStart.clientX;
         const dy = touch.clientY - leftStart.clientY;
+
         controls.forward = dy < -20;
         controls.back = dy > 20;
         controls.left = dx < -20;
@@ -184,7 +187,7 @@
 
     function animateGun() {
       let i = 0;
-      const delay = 50;
+      const delay = 60;
       function next() {
         if (i < gunFrames.length) {
           hudGun.src = gunFrames[i];
