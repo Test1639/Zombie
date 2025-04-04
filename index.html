@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter with Gun</title>
+  <title>2.5D Shooter with COD-style Gun HUD</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -16,13 +16,13 @@
     }
     #hud-gun {
       position: absolute;
-      bottom: 0;
-      right: 0;
-      width: 200px;
+      bottom: 10px;
+      right: 30px;
+      width: 300px;
       height: auto;
       pointer-events: none;
       z-index: 10;
-      transform: rotate(-2deg);
+      transform: rotate(-2deg) scale(1.1);
     }
     #info {
       position: absolute;
