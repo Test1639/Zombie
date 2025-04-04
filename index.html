@@ -1,179 +1,206 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Zombie Shooter 2D</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Zombie Survival: Mobile Edition</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
+      background: #111;
       overflow: hidden;
-      width: 100%;
-      height: 100%;
-      background: black;
-      touch-action: none;
+      font-family: sans-serif;
+      user-select: none;
     }
     canvas {
       display: block;
-      width: 100vw;
-      height: 100vh;
-      image-rendering: pixelated;
+      background: linear-gradient(#444, #111);
+      touch-action: none;
     }
-    .joystick-zone {
+    #ui {
       position: absolute;
-      width: 50%;
-      height: 100%;
-      top: 0;
-      z-index: 10;
-    }
-    #leftZone { left: 0; }
-    #rightZone { right: 0; }
-    #rotate-warning {
-      position: fixed;
       width: 100%;
       height: 100%;
-      background: #000;
-      color: white;
-      font-size: 24px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      z-index: 9999;
-      display: none;
+      pointer-events: none;
     }
+    .joystick {
+      position: absolute;
+      bottom: 10%;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      pointer-events: auto;
+    }
+    .joystick#left { left: 5%; }
+    .joystick#right { right: 5%; }
   </style>
 </head>
 <body>
-  <div id="leftZone" class="joystick-zone"></div>
-  <div id="rightZone" class="joystick-zone"></div>
-  <div id="rotate-warning">Please rotate your phone to landscape to play.</div>
-
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js"></script>
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <div class="joystick" id="left"></div>
+    <div class="joystick" id="right"></div>
+  </div>
   <script>
-    function checkOrientation() {
-      const isPortrait = window.innerHeight > window.innerWidth;
-      document.getElementById('rotate-warning').style.display = isPortrait ? 'flex' : 'none';
-    }
-    window.addEventListener('orientationchange', checkOrientation);
-    window.addEventListener('resize', checkOrientation);
-    checkOrientation();
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    let W = canvas.width = window.innerWidth;
+    let H = canvas.height = window.innerHeight;
 
-    const config = {
-      type: Phaser.AUTO,
-      width: 896,
-      height: 512,
-      scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
-      },
-      physics: {
-        default: 'arcade',
-        arcade: {
-          gravity: { y: 0 },
-          debug: false
-        }
-      },
-      pixelArt: true,
-      backgroundColor: '#000000',
-      scene: { preload, create, update }
+    window.addEventListener('resize', () => {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    });
+
+    const player = {
+      x: W/2, y: H/2, r: 20,
+      speed: 3,
+      angle: 0,
+      health: 100
     };
 
-    const game = new Phaser.Game(config);
-    let player, bullets, zombies, moveVelocity = { x: 0, y: 0 }, aimAngle = null;
-    let lastFired = 0, health = 100, ammo = 6, maxAmmo = 6, score = 0;
-    let healthBar, scoreText, ammoText;
+    const zombies = [];
+    const bullets = [];
+    let score = 0;
 
-    function preload() {
-      this.load.image('bg', 'assets/background_layer.png');
-      this.load.image('mg', 'assets/midground_layer.png');
-      this.load.image('fg', 'assets/foreground_layer.png');
-      this.load.image('player', 'assets/soldier.png');
-      this.load.image('zombie', 'assets/zombie.png');
-      this.load.image('bullet', 'assets/bullet.png');
+    function spawnZombie() {
+      const edge = Math.floor(Math.random() * 4);
+      let x, y;
+      if (edge === 0) { x = Math.random() * W; y = -30; }
+      else if (edge === 1) { x = W + 30; y = Math.random() * H; }
+      else if (edge === 2) { x = Math.random() * W; y = H + 30; }
+      else { x = -30; y = Math.random() * H; }
+      zombies.push({ x, y, r: 20, speed: 1 + Math.random() * 1.5 });
     }
 
-    function create() {
-      this.add.image(0, 0, 'bg').setOrigin(0).setDisplaySize(896, 512);
-      this.add.image(0, 0, 'mg').setOrigin(0).setDisplaySize(896, 512);
-      this.add.image(0, 0, 'fg').setOrigin(0).setDisplaySize(896, 512);
+    function shootBullet() {
+      const angle = player.angle;
+      bullets.push({
+        x: player.x + Math.cos(angle)*25,
+        y: player.y + Math.sin(angle)*25,
+        angle,
+        speed: 8,
+      });
+    }
 
-      player = this.physics.add.sprite(150, 405, 'player');
-      player.setScale(0.32);
-      player.setCollideWorldBounds(true);
+    function drawPlayer() {
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      ctx.rotate(player.angle);
+      ctx.fillStyle = "#0f0";
+      ctx.beginPath();
+      ctx.arc(0, 0, player.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(10, -5, 15, 10);
+      ctx.restore();
+    }
 
-      bullets = this.physics.add.group();
-      zombies = this.physics.add.group();
+    function drawZombies() {
+      ctx.fillStyle = "#f00";
+      zombies.forEach(z => {
+        ctx.beginPath();
+        ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
 
-      this.physics.add.overlap(bullets, zombies, hitZombie, null, this);
-      this.physics.add.overlap(player, zombies, playerHit, null, this);
+    function drawBullets() {
+      ctx.fillStyle = "#ff0";
+      bullets.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
 
-      scoreText = this.add.text(20, 20, 'Score: 0', { font: '20px Arial', fill: '#fff' });
-      ammoText = this.add.text(20, 45, 'Ammo: ' + ammo, { font: '20px Arial', fill: '#fff' });
-      healthBar = this.add.graphics();
-      updateHealthBar();
-
-      this.time.addEvent({
-        delay: 1200,
-        callback: () => {
-          const z = zombies.create(950, 405, 'zombie');
-          z.setVelocityX(-90);
-          z.setScale(0.32);
-        },
-        loop: true
+    function updateGame() {
+      bullets.forEach(b => {
+        b.x += Math.cos(b.angle) * b.speed;
+        b.y += Math.sin(b.angle) * b.speed;
       });
 
-      setupJoysticks();
+      zombies.forEach(z => {
+        const dx = player.x - z.x;
+        const dy = player.y - z.y;
+        const dist = Math.hypot(dx, dy);
+        z.x += (dx / dist) * z.speed;
+        z.y += (dy / dist) * z.speed;
+      });
+
+      for (let i = zombies.length - 1; i >= 0; i--) {
+        for (let j = bullets.length - 1; j >= 0; j--) {
+          const dx = bullets[j].x - zombies[i].x;
+          const dy = bullets[j].y - zombies[i].y;
+          if (Math.hypot(dx, dy) < 20) {
+            zombies.splice(i, 1);
+            bullets.splice(j, 1);
+            score += 10;
+            break;
+          }
+        }
+      }
+
+      zombies.forEach(z => {
+        const dx = player.x - z.x;
+        const dy = player.y - z.y;
+        if (Math.hypot(dx, dy) < player.r + z.r) {
+          player.health -= 0.5;
+        }
+      });
     }
 
-    function update(time) {
-      if (player) player.setVelocity(moveVelocity.x * 200, moveVelocity.y * 200);
-      if (aimAngle !== null && time > lastFired + 300 && ammo > 0) {
-        fireBullet(aimAngle); lastFired = time;
+    function drawHUD() {
+      ctx.fillStyle = "#fff";
+      ctx.font = "18px sans-serif";
+      ctx.fillText("Score: " + score, 20, 30);
+      ctx.fillText("Health: " + Math.max(0, Math.floor(player.health)), 20, 50);
+    }
+
+    function loop() {
+      ctx.clearRect(0, 0, W, H);
+      updateGame();
+      drawPlayer();
+      drawZombies();
+      drawBullets();
+      drawHUD();
+      if (Math.random() < 0.02) spawnZombie();
+      if (player.health > 0) requestAnimationFrame(loop);
+      else {
+        ctx.fillStyle = "red";
+        ctx.font = "40px sans-serif";
+        ctx.fillText("Game Over", W/2 - 100, H/2);
       }
     }
 
-    function fireBullet(angle) {
-      const bullet = bullets.create(player.x, player.y, 'bullet');
-      game.physics.velocityFromRotation(angle, 400, bullet.body.velocity);
-      ammo--; ammoText.setText('Ammo: ' + ammo);
-    }
+    setInterval(shootBullet, 500);
 
-    function hitZombie(bullet, zombie) {
-      bullet.destroy(); zombie.destroy(); score++;
-      scoreText.setText('Score: ' + score);
-    }
+    let touchX = null, touchY = null;
+    document.getElementById('left').addEventListener('touchstart', e => {
+      const touch = e.touches[0];
+      touchX = touch.clientX;
+      touchY = touch.clientY;
+    });
+    document.getElementById('left').addEventListener('touchmove', e => {
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchX;
+      const dy = touch.clientY - touchY;
+      const len = Math.hypot(dx, dy);
+      if (len > 10) {
+        player.x += (dx / len) * player.speed;
+        player.y += (dy / len) * player.speed;
+      }
+    });
+    document.getElementById('right').addEventListener('touchmove', e => {
+      const touch = e.touches[0];
+      const dx = touch.clientX - player.x;
+      const dy = touch.clientY - player.y;
+      player.angle = Math.atan2(dy, dx);
+    });
 
-    function playerHit(player, zombie) {
-      zombie.destroy(); health -= 10;
-      updateHealthBar();
-      if (health <= 0) game.scene.restart();
-    }
-
-    function updateHealthBar() {
-      healthBar.clear();
-      const color = health > 40 ? 0x2ecc71 : 0xe74c3c;
-      healthBar.fillStyle(color);
-      healthBar.fillRect(20, 70, health * 2, 20);
-      healthBar.lineStyle(2, 0xffffff);
-      healthBar.strokeRect(20, 70, 200, 20);
-    }
-
-    function setupJoysticks() {
-      const left = nipplejs.create({ zone: document.getElementById('leftZone'), mode: 'dynamic' });
-      const right = nipplejs.create({ zone: document.getElementById('rightZone'), mode: 'dynamic' });
-
-      left.on('move', (_, data) => {
-        moveVelocity.x = Math.cos(data.angle.radian);
-        moveVelocity.y = Math.sin(data.angle.radian);
-      }).on('end', () => moveVelocity = { x: 0, y: 0 });
-
-      right.on('move', (_, data) => {
-        aimAngle = data.angle.radian;
-      }).on('end', () => aimAngle = null);
-    }
+    loop();
   </script>
 </body>
 </html>
