@@ -2,20 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mobile FPS Test</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mobile FPS Fix</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
       background: #000;
-      touch-action: none;
       overscroll-behavior: none;
-      -ms-touch-action: none;
+      height: 100%;
+      touch-action: none;
       -webkit-user-select: none;
       user-select: none;
-      height: 100%;
-      overflow: hidden;
     }
     canvas {
       width: 100vw !important;
@@ -52,7 +50,7 @@
       background: red;
       border-radius: 50%;
       z-index: 10;
-      touch-action: manipulation;
+      touch-action: none;
     }
   </style>
 </head>
@@ -93,7 +91,6 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
-      // Ground plane
       const floor = new THREE.Mesh(
         new THREE.PlaneGeometry(100, 100),
         new THREE.MeshBasicMaterial({ color: 0x333333 })
@@ -101,28 +98,29 @@
       floor.rotation.x = -Math.PI / 2;
       scene.add(floor);
 
-      // Joysticks
       setupJoysticks();
 
-      // Resize handler
-      window.addEventListener("resize", () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
+      // Disable double-tap zoom
+      document.addEventListener('touchstart', e => {
+        if (e.touches.length > 1) e.preventDefault();
+      }, { passive: false });
 
-      document.getElementById("shootButton").addEventListener("touchstart", e => {
+      document.addEventListener('gesturestart', e => e.preventDefault());
+      document.addEventListener('gesturechange', e => e.preventDefault());
+      document.addEventListener('gestureend', e => e.preventDefault());
+
+      const shootBtn = document.getElementById("shootButton");
+      shootBtn.addEventListener("touchstart", e => {
         e.preventDefault();
         shootBullet();
         animateGun();
-      });
+      }, { passive: false });
     }
 
     function setupJoysticks() {
       const left = document.getElementById("leftJoystick");
       const right = document.getElementById("rightJoystick");
 
-      // Movement
       left.addEventListener("touchstart", e => {
         e.preventDefault();
         moveDir.start = e.touches[0];
@@ -143,7 +141,6 @@
         controls = { forward: false, back: false, left: false, right: false };
       });
 
-      // Look around
       right.addEventListener("touchstart", e => {
         e.preventDefault();
         lookInput.start = e.touches[0];
