@@ -1,379 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Nexus - Enhanced</title>
-    <style>
-        body { 
-            margin: 0; padding: 0; overflow: hidden; 
-            background: #000; touch-action: none;
-            font-family: Arial, sans-serif;
-            color: #0ff; text-shadow: 0 0 5px #0ff;
-        }
-        #gameCanvas { 
-            display: block; width: 100vw; height: 100vh; 
-        }
-        #ui {
-            position: absolute; top: 10px; left: 10px;
-            pointer-events: none;
-        }
-        .controlZone {
-            position: absolute; bottom: 20px;
-            width: 120px; height: 120px;
-            background: rgba(0, 255, 255, 0.1);
-            border-radius: 50%; border: 2px solid #0ff;
-        }
-        #movePad { left: 25px; }
-        #aimPad { right: 25px; }
-        #debug {
-            position: absolute; bottom: 10px; left: 10px;
-            font-size: 12px; color: #0f0;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>2.5D Shooter Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    canvas {
+      display: block;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 10;
+    }
+  </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="ui">
-        <div>ENERGY: <span id="energy">100</span>%</div>
-        <div>CREDITS: <span id="credits">0</span></div>
-        <div>WAVE: <span id="wave">1</span></div>
-    </div>
-    <div class="controlZone" id="movePad"></div>
-    <div class="controlZone" id="aimPad"></div>
-    <div id="debug"></div>
+  <div id="info">2.5D Shooter Demo - Move: WASD / Touch drag | Look: Mouse or swipe</div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+  <script>
+    let camera, scene, renderer;
+    let controls = { forward: false, back: false, left: false, right: false };
+    let velocity = new THREE.Vector3();
 
-    <script>
-        // Enhanced Game Version
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Set canvas to full screen
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+    init();
+    animate();
+
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 1.6, 5);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Floor
+      const floorGeo = new THREE.PlaneGeometry(100, 100);
+      const floorMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      scene.add(floor);
+
+      // Walls
+      const wallMat = new THREE.MeshBasicMaterial({ color: 0x4444aa });
+      for (let i = 0; i < 20; i++) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), wallMat);
+        wall.position.set(Math.random() * 20 - 10, 1, -i * 5);
+        scene.add(wall);
+      }
+
+      // Enemies (sprites)
+      const enemyTex = new THREE.TextureLoader().load('https://i.imgur.com/fYDOk8Y.png');
+      const enemyMat = new THREE.SpriteMaterial({ map: enemyTex });
+      for (let i = 0; i < 5; i++) {
+        const sprite = new THREE.Sprite(enemyMat);
+        sprite.position.set(Math.random() * 10 - 5, 1.5, -i * 10 - 5);
+        sprite.scale.set(1.5, 1.5, 1.5);
+        scene.add(sprite);
+      }
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      document.addEventListener('keydown', e => {
+        if (e.key === 'w') controls.forward = true;
+        if (e.key === 's') controls.back = true;
+        if (e.key === 'a') controls.left = true;
+        if (e.key === 'd') controls.right = true;
+      });
+      document.addEventListener('keyup', e => {
+        if (e.key === 'w') controls.forward = false;
+        if (e.key === 's') controls.back = false;
+        if (e.key === 'a') controls.left = false;
+        if (e.key === 'd') controls.right = false;
+      });
+
+      // Touch look and move
+      let touchStart = null;
+      document.addEventListener('touchstart', e => {
+        touchStart = e.touches[0];
+      });
+      document.addEventListener('touchmove', e => {
+        if (!touchStart) return;
+        const dx = e.touches[0].clientX - touchStart.clientX;
+        const dy = e.touches[0].clientY - touchStart.clientY;
+        camera.rotation.y -= dx * 0.005;
+        velocity.z = dy * 0.01;
+        touchStart = e.touches[0];
+      });
+
+      // Mouse look
+      document.addEventListener('mousemove', e => {
+        if (e.buttons === 1) {
+          camera.rotation.y -= e.movementX * 0.002;
         }
-        resize();
-        window.addEventListener('resize', resize);
-        
-        // Game state
-        const game = {
-            player: { 
-                x: canvas.width/2, 
-                y: canvas.height/2, 
-                size: 20, 
-                speed: 5,
-                lastShot: 0,
-                shootDelay: 200 // ms
-            },
-            bullets: [],
-            enemies: [],
-            energy: 100,
-            credits: 0,
-            wave: 1,
-            lastEnemySpawn: 0,
-            enemySpawnDelay: 1000, // ms
-            touch: {
-                move: { x: 0, y: 0, active: false },
-                aim: { x: 0, y: 0, active: false, angle: 0 }
-            },
-            lastTime: 0,
-            gameOver: false
-        };
-        
-        // Touch controls
-        function setupControls() {
-            const movePad = document.getElementById('movePad');
-            const aimPad = document.getElementById('aimPad');
-            
-            // Movement pad
-            movePad.addEventListener('touchstart', (e) => {
-                game.touch.move.active = true;
-                updateMoveTouch(e.touches[0], movePad);
-                e.preventDefault();
-            });
-            
-            movePad.addEventListener('touchmove', (e) => {
-                if (!game.touch.move.active) return;
-                updateMoveTouch(e.touches[0], movePad);
-                e.preventDefault();
-            });
-            
-            movePad.addEventListener('touchend', () => {
-                game.touch.move.active = false;
-                game.touch.move.x = game.touch.move.y = 0;
-            });
-            
-            // Aiming pad
-            aimPad.addEventListener('touchstart', (e) => {
-                game.touch.aim.active = true;
-                updateAimTouch(e.touches[0], aimPad);
-                e.preventDefault();
-            });
-            
-            aimPad.addEventListener('touchmove', (e) => {
-                if (!game.touch.aim.active) return;
-                updateAimTouch(e.touches[0], aimPad);
-                e.preventDefault();
-            });
-            
-            aimPad.addEventListener('touchend', () => {
-                game.touch.aim.active = false;
-                game.touch.aim.x = game.touch.aim.y = 0;
-            });
-        }
-        
-        function updateMoveTouch(touch, pad) {
-            const rect = pad.getBoundingClientRect();
-            const centerX = rect.left + rect.width/2;
-            const centerY = rect.top + rect.height/2;
-            
-            game.touch.move.x = (touch.clientX - centerX) / (rect.width/2);
-            game.touch.move.y = (touch.clientY - centerY) / (rect.height/2);
-            
-            // Normalize
-            const len = Math.sqrt(game.touch.move.x**2 + game.touch.move.y**2);
-            if (len > 1) {
-                game.touch.move.x /= len;
-                game.touch.move.y /= len;
-            }
-        }
-        
-        function updateAimTouch(touch, pad) {
-            const rect = pad.getBoundingClientRect();
-            const centerX = rect.left + rect.width/2;
-            const centerY = rect.top + rect.height/2;
-            
-            game.touch.aim.x = (touch.clientX - centerX) / (rect.width/2);
-            game.touch.aim.y = (touch.clientY - centerY) / (rect.height/2);
-            
-            // Calculate angle for shooting direction
-            game.touch.aim.angle = Math.atan2(game.touch.aim.y, game.touch.aim.x);
-            
-            // Normalize
-            const len = Math.sqrt(game.touch.aim.x**2 + game.touch.aim.y**2);
-            if (len > 0) {
-                game.touch.aim.x /= len;
-                game.touch.aim.y /= len;
-            }
-            
-            // Auto-shoot when aiming
-            shoot();
-        }
-        
-        function shoot() {
-            const now = Date.now();
-            if (now - game.player.lastShot < game.player.shootDelay) return;
-            
-            game.player.lastShot = now;
-            
-            game.bullets.push({
-                x: game.player.x,
-                y: game.player.y,
-                vx: Math.cos(game.touch.aim.angle) * 10,
-                vy: Math.sin(game.touch.aim.angle) * 10,
-                size: 5,
-                damage: 1
-            });
-            
-            // Muzzle flash effect
-            for (let i = 0; i < 3; i++) {
-                const angle = game.touch.aim.angle + (Math.random() - 0.5) * 0.2;
-                const speed = 2 + Math.random() * 2;
-                game.bullets.push({
-                    x: game.player.x,
-                    y: game.player.y,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed,
-                    size: 3,
-                    damage: 0, // Visual effect only
-                    life: 0.3 // Short-lived
-                });
-            }
-        }
-        
-        function spawnEnemy() {
-            // Spawn from edges
-            let x, y;
-            if (Math.random() > 0.5) {
-                x = Math.random() > 0.5 ? -20 : canvas.width + 20;
-                y = Math.random() * canvas.height;
-            } else {
-                x = Math.random() * canvas.width;
-                y = Math.random() > 0.5 ? -20 : canvas.height + 20;
-            }
-            
-            game.enemies.push({
-                x: x,
-                y: y,
-                size: 15,
-                speed: 1 + Math.random() * 2,
-                health: 1
-            });
-        }
-        
-        function update(deltaTime) {
-            if (game.gameOver) return;
-            
-            // Move player
-            if (game.touch.move.active) {
-                game.player.x += game.touch.move.x * game.player.speed;
-                game.player.y += game.touch.move.y * game.player.speed;
-                
-                // Keep in bounds
-                game.player.x = Math.max(game.player.size, Math.min(canvas.width-game.player.size, game.player.x));
-                game.player.y = Math.max(game.player.size, Math.min(canvas.height-game.player.size, game.player.y));
-            }
-            
-            // Move bullets
-            for (let i = game.bullets.length-1; i >= 0; i--) {
-                const b = game.bullets[i];
-                b.x += b.vx;
-                b.y += b.vy;
-                
-                // Remove if out of bounds or short-lived
-                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height || (b.life && (b.life -= deltaTime) <= 0) {
-                    game.bullets.splice(i, 1);
-                    continue;
-                }
-                
-                // Check bullet-enemy collisions
-                for (let j = game.enemies.length-1; j >= 0; j--) {
-                    const e = game.enemies[j];
-                    const dx = b.x - e.x;
-                    const dy = b.y - e.y;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (dist < e.size + b.size && b.damage > 0) {
-                        e.health -= b.damage;
-                        game.bullets.splice(i, 1);
-                        
-                        if (e.health <= 0) {
-                            game.enemies.splice(j, 1);
-                            game.credits += 10;
-                            document.getElementById('credits').textContent = game.credits;
-                            
-                            // Spawn more enemies after wave completion
-                            if (game.enemies.length === 0) {
-                                game.wave++;
-                                document.getElementById('wave').textContent = game.wave;
-                                for (let k = 0; k < 2 + game.wave; k++) {
-                                    spawnEnemy();
-                                }
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-            
-            // Spawn enemies periodically
-            const now = Date.now();
-            if (now - game.lastEnemySpawn > game.enemySpawnDelay) {
-                game.lastEnemySpawn = now;
-                spawnEnemy();
-            }
-            
-            // Move enemies toward player
-            for (const enemy of game.enemies) {
-                const dx = game.player.x - enemy.x;
-                const dy = game.player.y - enemy.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                
-                if (dist > 0) {
-                    enemy.x += (dx/dist) * enemy.speed;
-                    enemy.y += (dy/dist) * enemy.speed;
-                }
-                
-                // Enemy-player collision
-                if (dist < enemy.size + game.player.size) {
-                    game.energy -= 0.5; // Continuous damage
-                    document.getElementById('energy').textContent = Math.floor(game.energy);
-                    
-                    if (game.energy <= 0) {
-                        game.gameOver = true;
-                        alert(`GAME OVER\nWave: ${game.wave}\nCredits: ${game.credits}`);
-                        resetGame();
-                    }
-                }
-            }
-        }
-        
-        function render() {
-            // Clear screen
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw player (always faces shooting direction)
-            ctx.fillStyle = '#0ff';
-            ctx.beginPath();
-            ctx.arc(game.player.x, game.player.y, game.player.size, 0, Math.PI*2);
-            ctx.fill();
-            
-            // Draw bullets
-            for (const bullet of game.bullets) {
-                ctx.fillStyle = bullet.damage > 0 ? '#ff0' : 'rgba(255, 200, 0, 0.7)';
-                ctx.beginPath();
-                ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI*2);
-                ctx.fill();
-            }
-            
-            // Draw enemies
-            for (const enemy of game.enemies) {
-                ctx.fillStyle = '#f00';
-                ctx.beginPath();
-                ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI*2);
-                ctx.fill();
-                
-                // Health indicator
-                if (enemy.health < 1) {
-                    ctx.fillStyle = '#fff';
-                    ctx.fillRect(enemy.x - 10, enemy.y - enemy.size - 5, 20 * enemy.health, 3);
-                }
-            }
-            
-            // Draw aim direction
-            if (game.touch.aim.active) {
-                ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(game.player.x, game.player.y);
-                ctx.lineTo(
-                    game.player.x + Math.cos(game.touch.aim.angle) * 40,
-                    game.player.y + Math.sin(game.touch.aim.angle) * 40
-                );
-                ctx.stroke();
-            }
-        }
-        
-        function resetGame() {
-            game.player.x = canvas.width/2;
-            game.player.y = canvas.height/2;
-            game.bullets = [];
-            game.enemies = [];
-            game.energy = 100;
-            game.credits = 0;
-            game.wave = 1;
-            game.gameOver = false;
-            document.getElementById('energy').textContent = game.energy;
-            document.getElementById('credits').textContent = game.credits;
-            document.getElementById('wave').textContent = game.wave;
-        }
-        
-        // Main game loop
-        function gameLoop(timestamp) {
-            if (!game.lastTime) game.lastTime = timestamp;
-            const deltaTime = (timestamp - game.lastTime) / 1000;
-            game.lastTime = timestamp;
-            
-            update(deltaTime);
-            render();
-            requestAnimationFrame(gameLoop);
-        }
-        
-        // Start the game
-        setupControls();
-        gameLoop();
-    </script>
+      });
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const direction = new THREE.Vector3();
+      if (controls.forward) direction.z -= 0.1;
+      if (controls.back) direction.z += 0.1;
+      if (controls.left) direction.x -= 0.1;
+      if (controls.right) direction.x += 0.1;
+
+      direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
+      camera.position.add(direction);
+
+      renderer.render(scene, camera);
+    }
+  </script>
 </body>
 </html>
