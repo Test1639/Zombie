@@ -138,7 +138,9 @@
       lastShotTime = now;
 
       const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-      const muzzleOffset = new THREE.Vector3(0.25, -0.25, -0.5).applyQuaternion(camera.quaternion);
+
+      // Correct muzzle offset for pistol
+      const muzzleOffset = new THREE.Vector3(0, -0.15, -0.5).applyQuaternion(camera.quaternion);
       bullet.position.copy(camera.position).add(muzzleOffset);
 
       const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
