@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter Demo</title>
+  <title>2.5D Shooter Demo - Refined Shooting</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -26,19 +26,25 @@
   </style>
 </head>
 <body>
-  <div id="info">2.5D Shooter Demo - Move: WASD / Touch drag | Look: Mouse or swipe</div>
+  <div id="info">2.5D Shooter - Refined Shooting | Tap or Click to Fire</div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
     let camera, scene, renderer;
     let controls = { forward: false, back: false, left: false, right: false };
-    let velocity = new THREE.Vector3();
+    const bullets = [];
+    const bulletSpeed = 1;
+    const bulletSize = 0.08;
+    let lastShotTime = 0;
+    const fireDelay = 300;
+    const bulletGeo = new THREE.SphereGeometry(bulletSize, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 
     init();
     animate();
 
     function init() {
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
       camera.position.set(0, 1.6, 5);
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -60,7 +66,7 @@
         scene.add(wall);
       }
 
-      // Enemies (sprites)
+      // Sprites (Enemies)
       const enemyTex = new THREE.TextureLoader().load('https://i.imgur.com/fYDOk8Y.png');
       const enemyMat = new THREE.SpriteMaterial({ map: enemyTex });
       for (let i = 0; i < 5; i++) {
@@ -93,13 +99,12 @@
       let touchStart = null;
       document.addEventListener('touchstart', e => {
         touchStart = e.touches[0];
+        shootBullet(); // Fire on touch
       });
       document.addEventListener('touchmove', e => {
         if (!touchStart) return;
         const dx = e.touches[0].clientX - touchStart.clientX;
-        const dy = e.touches[0].clientY - touchStart.clientY;
         camera.rotation.y -= dx * 0.005;
-        velocity.z = dy * 0.01;
         touchStart = e.touches[0];
       });
 
@@ -109,20 +114,50 @@
           camera.rotation.y -= e.movementX * 0.002;
         }
       });
+
+      // Mouse fire
+      document.addEventListener('click', shootBullet);
+    }
+
+    function shootBullet() {
+      const now = performance.now();
+      if (now - lastShotTime < fireDelay) return;
+      lastShotTime = now;
+
+      const bullet = new THREE.Mesh(bulletGeo, bulletMat);
+      const offset = new THREE.Vector3(0, 0, -0.5).applyQuaternion(camera.quaternion);
+      bullet.position.copy(camera.position).add(offset);
+
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+      bullet.velocity = direction.multiplyScalar(bulletSpeed);
+
+      bullets.push(bullet);
+      scene.add(bullet);
+    }
+
+    function updateBullets() {
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const bullet = bullets[i];
+        bullet.position.add(bullet.velocity);
+        if (bullet.position.distanceTo(camera.position) > 50) {
+          scene.remove(bullet);
+          bullets.splice(i, 1);
+        }
+      }
     }
 
     function animate() {
       requestAnimationFrame(animate);
 
-      const direction = new THREE.Vector3();
-      if (controls.forward) direction.z -= 0.1;
-      if (controls.back) direction.z += 0.1;
-      if (controls.left) direction.x -= 0.1;
-      if (controls.right) direction.x += 0.1;
+      const dir = new THREE.Vector3();
+      if (controls.forward) dir.z -= 0.1;
+      if (controls.back) dir.z += 0.1;
+      if (controls.left) dir.x -= 0.1;
+      if (controls.right) dir.x += 0.1;
+      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
+      camera.position.add(dir);
 
-      direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
-      camera.position.add(direction);
-
+      updateBullets();
       renderer.render(scene, camera);
     }
   </script>
