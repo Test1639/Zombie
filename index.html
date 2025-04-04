@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter with Joysticks & Gun Animation</title>
+  <title>2.5D Shooter - Smooth Controls</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -60,23 +60,24 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
     let camera, scene, renderer;
-    let controls = { forward: false, back: false, left: false, right: false };
     const bullets = [];
     const bulletSpeed = 1;
     const bulletSize = 0.08;
     let lastShotTime = 0;
     const fireDelay = 300;
+
+    let moveX = 0, moveZ = 0;
+    let targetX = 0, targetZ = 0;
+    let lookDelta = 0;
+    const smoothing = 0.1;
+
     const bulletGeo = new THREE.SphereGeometry(bulletSize, 8, 8);
     const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 
     const hudGun = document.getElementById("hud-gun");
     const gunFrames = [
-      "assets/images/frame1.png",
-      "assets/images/frame2.png",
-      "assets/images/frame3.png",
-      "assets/images/frame4.png",
-      "assets/images/frame5.png",
-      "assets/images/frame6.png"
+      "assets/images/frame1.png", "assets/images/frame2.png", "assets/images/frame3.png",
+      "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png"
     ];
 
     init();
@@ -89,8 +90,8 @@
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setClearColor(0x000000);
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000);
       document.body.appendChild(renderer.domElement);
 
       const floor = new THREE.Mesh(
@@ -118,54 +119,33 @@
         animateGun();
       });
 
-      document.addEventListener("keydown", e => {
-        if (e.key === 'w') controls.forward = true;
-        if (e.key === 's') controls.back = true;
-        if (e.key === 'a') controls.left = true;
-        if (e.key === 'd') controls.right = true;
-      });
-      document.addEventListener("keyup", e => {
-        if (e.key === 'w') controls.forward = false;
-        if (e.key === 's') controls.back = false;
-        if (e.key === 'a') controls.left = false;
-        if (e.key === 'd') controls.right = false;
-      });
-
-      // Joystick movement
+      // --- Joystick logic ---
+      const leftJoy = document.getElementById("leftJoystick");
+      const rightJoy = document.getElementById("rightJoystick");
       let leftStart = null;
       let rightStart = null;
 
-      const leftJoy = document.getElementById("leftJoystick");
-      const rightJoy = document.getElementById("rightJoystick");
-
-      leftJoy.addEventListener("touchstart", e => {
-        leftStart = e.touches[0];
-      });
-
+      leftJoy.addEventListener("touchstart", e => leftStart = e.touches[0]);
       leftJoy.addEventListener("touchmove", e => {
         const touch = e.touches[0];
         const dx = touch.clientX - leftStart.clientX;
         const dy = touch.clientY - leftStart.clientY;
-
-        controls.forward = dy < -20;
-        controls.back = dy > 20;
-        controls.left = dx < -20;
-        controls.right = dx > 20;
+        targetX = dx * 0.02;
+        targetZ = dy * 0.02;
       });
-
       leftJoy.addEventListener("touchend", () => {
-        controls.forward = controls.back = controls.left = controls.right = false;
+        targetX = targetZ = 0;
       });
 
-      rightJoy.addEventListener("touchstart", e => {
-        rightStart = e.touches[0];
-      });
-
+      rightJoy.addEventListener("touchstart", e => rightStart = e.touches[0]);
       rightJoy.addEventListener("touchmove", e => {
         const touch = e.touches[0];
         const dx = touch.clientX - rightStart.clientX;
-        camera.rotation.y -= dx * 0.005;
+        lookDelta = dx * 0.002;
         rightStart = touch;
+      });
+      rightJoy.addEventListener("touchend", () => {
+        lookDelta = 0;
       });
     }
 
@@ -187,7 +167,7 @@
 
     function animateGun() {
       let i = 0;
-      const delay = 60;
+      const delay = 50;
       function next() {
         if (i < gunFrames.length) {
           hudGun.src = gunFrames[i];
@@ -213,14 +193,14 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      const dir = new THREE.Vector3();
-      if (controls.forward) dir.z -= 0.1;
-      if (controls.back) dir.z += 0.1;
-      if (controls.left) dir.x -= 0.1;
-      if (controls.right) dir.x += 0.1;
-      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
-      camera.position.add(dir);
 
+      moveX += (targetX - moveX) * smoothing;
+      moveZ += (targetZ - moveZ) * smoothing;
+
+      const moveVector = new THREE.Vector3(moveX, 0, moveZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
+      camera.position.add(moveVector);
+
+      camera.rotation.y -= lookDelta;
       updateBullets();
       renderer.render(scene, camera);
     }
