@@ -3,42 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEON NEXUS</title>
+    <title>Neon Nexus - Fixed Version</title>
     <style>
-        /* Cyberpunk UI */
         body { 
             margin: 0; padding: 0; overflow: hidden; 
             background: #000; touch-action: none;
-            font-family: 'Rajdhani', sans-serif;
-            color: #0ff; text-shadow: 0 0 8px #0ff;
-        }
-        @font-face {
-            font-family: 'Rajdhani';
-            src: url('data:font/woff2;base64,d09GMgABAAAA...') format('woff2');
+            font-family: Arial, sans-serif;
+            color: #0ff; text-shadow: 0 0 5px #0ff;
         }
         #gameCanvas { 
             display: block; width: 100vw; height: 100vh; 
-            image-rendering: crisp-edges;
         }
         #ui {
-            position: absolute; top: 0; left: 0; right: 0;
-            padding: 15px; pointer-events: none;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
-            display: flex; justify-content: space-between;
+            position: absolute; top: 10px; left: 10px;
+            pointer-events: none;
         }
         .controlZone {
-            position: absolute; bottom: 30px;
+            position: absolute; bottom: 20px;
             width: 120px; height: 120px;
             background: rgba(0, 255, 255, 0.1);
             border-radius: 50%; border: 2px solid #0ff;
-            box-shadow: 0 0 15px #0ff;
         }
         #movePad { left: 25px; }
         #aimPad { right: 25px; }
-        #debug {
-            position: absolute; bottom: 10px; left: 10px;
-            font-size: 12px; color: #0f0;
-        }
     </style>
 </head>
 <body>
@@ -50,793 +37,225 @@
     </div>
     <div class="controlZone" id="movePad"></div>
     <div class="controlZone" id="aimPad"></div>
-    <div id="debug"></div>
 
     <script>
-        // ███╗   ██╗███████╗ ██████╗ ███╗   ██╗
-        // ████╗  ██║██╔════╝██╔═══██╗████╗  ██║
-        // ██╔██╗ ██║█████╗  ██║   ██║██╔██╗ ██║
-        // ██║╚██╗██║██╔══╝  ██║   ██║██║╚██╗██║
-        // ██║ ╚████║███████╗╚██████╔╝██║ ╚████║
-        // ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝
-
-        // ==================== CYBER ENGINE CORE ====================
-        class CyberEngine {
-            constructor() {
-                this.canvas = document.getElementById('gameCanvas');
-                this.gl = this.canvas.getContext('webgl2', { 
-                    antialias: false,
-                    powerPreference: "high-performance"
-                }) || this.canvas.getContext('experimental-webgl2');
+        // SIMPLIFIED WORKING VERSION
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas to full screen
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // Game state
+        const game = {
+            player: { x: canvas.width/2, y: canvas.height/2, size: 20, speed: 5 },
+            bullets: [],
+            enemies: [],
+            energy: 100,
+            credits: 0,
+            wave: 1,
+            touch: {
+                move: { x: 0, y: 0, active: false },
+                aim: { x: 0, y: 0, active: false }
+            }
+        };
+        
+        // Touch controls
+        function setupControls() {
+            const movePad = document.getElementById('movePad');
+            const aimPad = document.getElementById('aimPad');
+            
+            // Movement pad
+            movePad.addEventListener('touchstart', (e) => {
+                game.touch.move.active = true;
+                updateMoveTouch(e.touches[0], movePad);
+                e.preventDefault();
+            });
+            
+            movePad.addEventListener('touchmove', (e) => {
+                if (!game.touch.move.active) return;
+                updateMoveTouch(e.touches[0], movePad);
+                e.preventDefault();
+            });
+            
+            movePad.addEventListener('touchend', () => {
+                game.touch.move.active = false;
+                game.touch.move.x = game.touch.move.y = 0;
+            });
+            
+            // Aiming pad
+            aimPad.addEventListener('touchstart', (e) => {
+                game.touch.aim.active = true;
+                updateAimTouch(e.touches[0], aimPad);
+                e.preventDefault();
+            });
+            
+            aimPad.addEventListener('touchmove', (e) => {
+                if (!game.touch.aim.active) return;
+                updateAimTouch(e.touches[0], aimPad);
+                e.preventDefault();
+            });
+            
+            aimPad.addEventListener('touchend', () => {
+                game.touch.aim.active = false;
+                game.touch.aim.x = game.touch.aim.y = 0;
+            });
+        }
+        
+        function updateMoveTouch(touch, pad) {
+            const rect = pad.getBoundingClientRect();
+            const centerX = rect.left + rect.width/2;
+            const centerY = rect.top + rect.height/2;
+            
+            game.touch.move.x = (touch.clientX - centerX) / (rect.width/2);
+            game.touch.move.y = (touch.clientY - centerY) / (rect.height/2);
+            
+            // Normalize
+            const len = Math.sqrt(game.touch.move.x**2 + game.touch.move.y**2);
+            if (len > 1) {
+                game.touch.move.x /= len;
+                game.touch.move.y /= len;
+            }
+        }
+        
+        function updateAimTouch(touch, pad) {
+            const rect = pad.getBoundingClientRect();
+            const centerX = rect.left + rect.width/2;
+            const centerY = rect.top + rect.height/2;
+            
+            game.touch.aim.x = (touch.clientX - centerX) / (rect.width/2);
+            game.touch.aim.y = (touch.clientY - centerY) / (rect.height/2);
+            
+            // Normalize
+            const len = Math.sqrt(game.touch.aim.x**2 + game.touch.aim.y**2);
+            if (len > 0) {
+                game.touch.aim.x /= len;
+                game.touch.aim.y /= len;
+            }
+            
+            // Shoot when aiming
+            shoot();
+        }
+        
+        function shoot() {
+            game.bullets.push({
+                x: game.player.x,
+                y: game.player.y,
+                vx: game.touch.aim.x * 10,
+                vy: game.touch.aim.y * 10,
+                size: 5
+            });
+        }
+        
+        function update() {
+            // Move player
+            if (game.touch.move.active) {
+                game.player.x += game.touch.move.x * game.player.speed;
+                game.player.y += game.touch.move.y * game.player.speed;
                 
-                if (!this.gl) {
-                    alert("WEBGL2 REQUIRED\nYour device doesn't support the required graphics API.");
-                    return;
+                // Keep in bounds
+                game.player.x = Math.max(game.player.size, Math.min(canvas.width-game.player.size, game.player.x));
+                game.player.y = Math.max(game.player.size, Math.min(canvas.height-game.player.size, game.player.y));
+            }
+            
+            // Move bullets
+            for (let i = game.bullets.length-1; i >= 0; i--) {
+                const b = game.bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                
+                // Remove if out of bounds
+                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+                    game.bullets.splice(i, 1);
                 }
-                
-                this.resize();
-                window.addEventListener('resize', () => this.resize());
-                
-                this.shaders = {};
-                this.meshes = {};
-                this.textures = {};
-                this.particles = [];
-                this.time = 0;
-                this.deltaTime = 0;
-                this.lastFrame = performance.now();
-                
-                this.initShaders();
-                this.initGeometry();
-                this.initTextures();
             }
             
-            resize() {
-                const dpr = window.devicePixelRatio || 1;
-                this.canvas.width = window.innerWidth * dpr;
-                this.canvas.height = window.innerHeight * dpr;
-                this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-            }
-            
-            initShaders() {
-                // Cyberpunk vertex shader with scanline effect
-                const vsSource = `#version 300 es
-                precision highp float;
-                in vec3 position;
-                in vec2 uv;
-                out vec2 vUv;
-                out vec3 vPosition;
-                
-                uniform mat4 modelViewMatrix;
-                uniform mat4 projectionMatrix;
-                uniform float time;
-                
-                void main() {
-                    vUv = uv;
-                    vPosition = position;
-                    
-                    // Glitch effect
-                    float glitch = sin(time * 10.0 + position.y * 50.0) * 0.005;
-                    
-                    gl_Position = projectionMatrix * modelViewMatrix * 
-                                 vec4(position + vec3(glitch, 0, 0), 1.0);
-                }`;
-                
-                // Neon fragment shader
-                const fsSource = `#version 300 es
-                precision highp float;
-                in vec2 vUv;
-                in vec3 vPosition;
-                out vec4 fragColor;
-                
-                uniform sampler2D map;
-                uniform vec3 color;
-                uniform float time;
-                
-                void main() {
-                    vec4 texel = texture(map, vUv);
-                    
-                    // Scanline effect
-                    float scanline = sin(vPosition.y * 800.0 + time * 5.0) * 0.1 + 0.9;
-                    
-                    // RGB shift
-                    float shift = 0.01 * sin(time * 2.0);
-                    vec3 rgb;
-                    rgb.r = texture(map, vUv + vec2(shift, 0)).r;
-                    rgb.g = texture(map, vUv).g;
-                    rgb.b = texture(map, vUv - vec2(shift, 0)).b;
-                    
-                    fragColor = vec4(rgb * color * scanline, texel.a);
-                    fragColor.rgb = pow(fragColor.rgb, vec3(1.0/2.2)); // Gamma correction
-                }`;
-                
-                this.createShader('neon', vsSource, fsSource);
-            }
-            
-            createShader(name, vs, fs) {
-                const gl = this.gl;
-                
-                const compileShader = (source, type) => {
-                    const shader = gl.createShader(type);
-                    gl.shaderSource(shader, source);
-                    gl.compileShader(shader);
-                    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                        console.error('Shader error:', gl.getShaderInfoLog(shader));
-                        return null;
-                    }
-                    return shader;
-                };
-                
-                const vertexShader = compileShader(vs, gl.VERTEX_SHADER);
-                const fragmentShader = compileShader(fs, gl.FRAGMENT_SHADER);
-                
-                const program = gl.createProgram();
-                gl.attachShader(program, vertexShader);
-                gl.attachShader(program, fragmentShader);
-                gl.linkProgram(program);
-                
-                if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                    console.error('Program link error:', gl.getProgramInfoLog(program));
-                    return;
-                }
-                
-                this.shaders[name] = {
-                    program,
-                    attributes: {
-                        position: gl.getAttribLocation(program, 'position'),
-                        uv: gl.getAttribLocation(program, 'uv')
-                    },
-                    uniforms: {
-                        projectionMatrix: gl.getUniformLocation(program, 'projectionMatrix'),
-                        modelViewMatrix: gl.getUniformLocation(program, 'modelViewMatrix'),
-                        map: gl.getUniformLocation(program, 'map'),
-                        color: gl.getUniformLocation(program, 'color'),
-                        time: gl.getUniformLocation(program, 'time')
-                    }
-                };
-            }
-            
-            initGeometry() {
-                // Quad geometry
-                const vertices = new Float32Array([
-                    -0.5, -0.5, 0,  0, 0,
-                     0.5, -0.5, 0,  1, 0,
-                     0.5,  0.5, 0,  1, 1,
-                    -0.5,  0.5, 0,  0, 1
-                ]);
-                
-                const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
-                
-                this.createMesh('quad', vertices, indices);
-                
-                // Hexagon geometry (for enemies)
-                const hexVerts = [];
-                const hexIndices = [];
-                const segments = 6;
-                
-                for (let i = 0; i < segments; i++) {
-                    const angle = (i / segments) * Math.PI * 2;
-                    hexVerts.push(
-                        Math.cos(angle) * 0.5, Math.sin(angle) * 0.5, 0,
-                        Math.cos(angle) * 0.5, Math.sin(angle) * 0.5, 0
-                    );
-                    
-                    if (i > 0) {
-                        hexIndices.push(0, i, i + 1);
-                    }
-                }
-                hexIndices.push(0, segments, 1);
-                
-                this.createMesh('hexagon', new Float32Array(hexVerts), new Uint16Array(hexIndices));
-            }
-            
-            createMesh(name, vertices, indices) {
-                const gl = this.gl;
-                
-                const vao = gl.createVertexArray();
-                gl.bindVertexArray(vao);
-                
-                const vertexBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-                gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-                
-                const indexBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-                
-                gl.enableVertexAttribArray(0);
-                gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
-                
-                gl.enableVertexAttribArray(1);
-                gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
-                
-                this.meshes[name] = {
-                    vao,
-                    vertexBuffer,
-                    indexBuffer,
-                    count: indices.length
-                };
-            }
-            
-            initTextures() {
-                // Procedural neon circle texture
-                const createTexture = (size, color) => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = size;
-                    canvas.height = size;
-                    const ctx = canvas.getContext('2d');
-                    
-                    const gradient = ctx.createRadialGradient(
-                        size/2, size/2, 0,
-                        size/2, size/2, size/2
-                    );
-                    gradient.addColorStop(0, color);
-                    gradient.addColorStop(0.8, color.replace('1)', '0.2)'));
-                    gradient.addColorStop(1, 'rgba(0,0,0,0)');
-                    
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, size, size);
-                    
-                    return canvas;
-                };
-                
-                this.createGLTexture('particle', createTexture(64, 'rgba(0,255,255,1)'));
-                this.createGLTexture('enemy', createTexture(64, 'rgba(255,0,100,1)'));
-                this.createGLTexture('bullet', createTexture(32, 'rgba(255,200,0,1)'));
-            }
-            
-            createGLTexture(name, source) {
-                const gl = this.gl;
-                const texture = gl.createTexture();
-                gl.bindTexture(gl.TEXTURE_2D, texture);
-                
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
-                
-                this.textures[name] = texture;
-            }
-            
-            update() {
-                const now = performance.now();
-                this.deltaTime = (now - this.lastFrame) / 1000;
-                this.time += this.deltaTime;
-                this.lastFrame = now;
-            }
-            
-            render(objects) {
-                const gl = this.gl;
-                
-                // Clear screen with dark blue
-                gl.clearColor(0.02, 0.03, 0.1, 1.0);
-                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                
-                // Set up projection matrix (orthographic)
-                const projectionMatrix = new Float32Array(16);
-                const aspect = this.canvas.width / this.canvas.height;
-                const zoom = 5;
-                
-                projectionMatrix[0] = zoom / aspect;
-                projectionMatrix[5] = zoom;
-                projectionMatrix[10] = -1;
-                projectionMatrix[11] = -1;
-                projectionMatrix[14] = 0;
-                
-                // Render all objects
-                const shader = this.shaders.neon;
-                gl.useProgram(shader.program);
-                
-                gl.uniformMatrix4fv(shader.uniforms.projectionMatrix, false, projectionMatrix);
-                gl.uniform1f(shader.uniforms.time, this.time);
-                
-                objects.forEach(obj => {
-                    if (!obj.visible) return;
-                    
-                    // Bind texture
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, this.textures[obj.texture]);
-                    gl.uniform1i(shader.uniforms.map, 0);
-                    
-                    // Set color
-                    gl.uniform3f(shader.uniforms.color, 
-                        obj.color[0], obj.color[1], obj.color[2]);
-                    
-                    // Create model matrix
-                    const modelViewMatrix = new Float32Array(16);
-                    modelViewMatrix[0] = obj.scale[0];
-                    modelViewMatrix[5] = obj.scale[1];
-                    modelViewMatrix[10] = 1;
-                    modelViewMatrix[12] = obj.position[0];
-                    modelViewMatrix[13] = obj.position[1];
-                    modelViewMatrix[15] = 1;
-                    
-                    gl.uniformMatrix4fv(shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-                    
-                    // Draw
-                    gl.bindVertexArray(this.meshes[obj.mesh].vao);
-                    gl.drawElements(gl.TRIANGLES, this.meshes[obj.mesh].count, gl.UNSIGNED_SHORT, 0);
-                });
-                
-                // Render particles
-                gl.bindVertexArray(this.meshes.quad.vao);
-                this.particles.forEach(particle => {
-                    if (!particle.alive) return;
-                    
-                    // Update particle
-                    particle.position[0] += particle.velocity[0] * this.deltaTime;
-                    particle.position[1] += particle.velocity[1] * this.deltaTime;
-                    particle.life -= this.deltaTime;
-                    
-                    if (particle.life <= 0) {
-                        particle.alive = false;
-                        return;
-                    }
-                    
-                    // Bind texture
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, this.textures[particle.texture]);
-                    gl.uniform1i(shader.uniforms.map, 0);
-                    
-                    // Set color with fadeout
-                    const alpha = Math.min(1, particle.life * 2);
-                    gl.uniform3f(shader.uniforms.color, 
-                        particle.color[0] * alpha, 
-                        particle.color[1] * alpha, 
-                        particle.color[2] * alpha);
-                    
-                    // Create model matrix
-                    const modelViewMatrix = new Float32Array(16);
-                    const scale = particle.size * (0.3 + particle.life * 0.7);
-                    modelViewMatrix[0] = scale;
-                    modelViewMatrix[5] = scale;
-                    modelViewMatrix[10] = 1;
-                    modelViewMatrix[12] = particle.position[0];
-                    modelViewMatrix[13] = particle.position[1];
-                    modelViewMatrix[15] = 1;
-                    
-                    gl.uniformMatrix4fv(shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-                    gl.drawElements(gl.TRIANGLES, this.meshes.quad.count, gl.UNSIGNED_SHORT, 0);
-                });
-                
-                // Clean up dead particles
-                this.particles = this.particles.filter(p => p.alive);
-            }
-            
-            addParticle(x, y, vx, vy, color, size = 0.3, life = 1.0, texture = 'particle') {
-                this.particles.push({
-                    position: [x, y],
-                    velocity: [vx, vy],
-                    color,
-                    size,
-                    life,
-                    texture,
-                    alive: true
+            // Spawn enemies occasionally
+            if (Math.random() < 0.02) {
+                game.enemies.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: 15,
+                    speed: 1 + Math.random() * 2
                 });
             }
             
-            createExplosion(x, y, color, count = 20) {
-                for (let i = 0; i < count; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const speed = 1 + Math.random() * 3;
-                    this.addParticle(
-                        x, y,
-                        Math.cos(angle) * speed,
-                        Math.sin(angle) * speed,
-                        color,
-                        0.2 + Math.random() * 0.3,
-                        0.5 + Math.random() * 0.7
-                    );
+            // Move enemies toward player
+            for (const enemy of game.enemies) {
+                const dx = game.player.x - enemy.x;
+                const dy = game.player.y - enemy.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist > 0) {
+                    enemy.x += (dx/dist) * enemy.speed;
+                    enemy.y += (dy/dist) * enemy.speed;
                 }
             }
         }
-
-        // ==================== GAME SYSTEMS ====================
-        class NeonNexusGame {
-            constructor() {
-                this.engine = new CyberEngine();
-                this.player = {
-                    x: 0, y: 0,
-                    energy: 100,
-                    weapons: [
-                        { type: 'PULSE', level: 1, cooldown: 0, maxCooldown: 0.15 }
-                    ],
-                    activeWeapon: 0
-                };
-                
-                this.enemies = [];
-                this.bullets = [];
-                this.wave = 1;
-                this.credits = 0;
-                this.gameTime = 0;
-                
-                this.touch = {
-                    move: { x: 0, y: 0, active: false },
-                    aim: { x: 0, y: 0, active: false }
-                };
-                
-                this.setupControls();
-                this.spawnWave();
-                
-                this.lastUpdate = performance.now();
-                requestAnimationFrame(() => this.gameLoop());
+        
+        function render() {
+            // Clear screen
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw player
+            ctx.fillStyle = '#0ff';
+            ctx.beginPath();
+            ctx.arc(game.player.x, game.player.y, game.player.size, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Draw bullets
+            ctx.fillStyle = '#ff0';
+            for (const bullet of game.bullets) {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI*2);
+                ctx.fill();
             }
             
-            setupControls() {
-                const movePad = document.getElementById('movePad');
-                const aimPad = document.getElementById('aimPad');
-                
-                // Movement pad
-                const handleMoveStart = (e) => {
-                    this.touch.move.active = true;
-                    this.updateMoveTouch(e.touches[0], movePad);
-                    e.preventDefault();
-                };
-                
-                const handleMoveMove = (e) => {
-                    if (!this.touch.move.active) return;
-                    this.updateMoveTouch(e.touches[0], movePad);
-                    e.preventDefault();
-                };
-                
-                const handleMoveEnd = () => {
-                    this.touch.move.active = false;
-                    this.touch.move.x = this.touch.move.y = 0;
-                };
-                
-                movePad.addEventListener('touchstart', handleMoveStart);
-                movePad.addEventListener('touchmove', handleMoveMove);
-                movePad.addEventListener('touchend', handleMoveEnd);
-                
-                // Aiming pad
-                const handleAimStart = (e) => {
-                    this.touch.aim.active = true;
-                    this.updateAimTouch(e.touches[0], aimPad);
-                    e.preventDefault();
-                };
-                
-                const handleAimMove = (e) => {
-                    if (!this.touch.aim.active) return;
-                    this.updateAimTouch(e.touches[0], aimPad);
-                    e.preventDefault();
-                };
-                
-                const handleAimEnd = () => {
-                    this.touch.aim.active = false;
-                    this.touch.aim.x = this.touch.aim.y = 0;
-                };
-                
-                aimPad.addEventListener('touchstart', handleAimStart);
-                aimPad.addEventListener('touchmove', handleAimMove);
-                aimPad.addEventListener('touchend', handleAimEnd);
-                
-                // Gyro controls (optional)
-                if (window.DeviceOrientationEvent) {
-                    window.addEventListener('deviceorientation', (e) => {
-                        if (!this.touch.aim.active) {
-                            const beta = e.beta ? Math.max(-45, Math.min(45, e.beta)) / 45;
-                            const gamma = e.gamma ? Math.max(-45, Math.min(45, e.gamma)) / 45;
-                            this.touch.aim.x = gamma;
-                            this.touch.aim.y = beta;
-                        }
-                    });
-                }
+            // Draw enemies
+            ctx.fillStyle = '#f00';
+            for (const enemy of game.enemies) {
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI*2);
+                ctx.fill();
             }
             
-            updateMoveTouch(touch, pad) {
-                const rect = pad.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-                
-                this.touch.move.x = (touch.clientX - centerX) / (rect.width / 2);
-                this.touch.move.y = (touch.clientY - centerY) / (rect.height / 2);
-                
-                // Normalize vector
-                const len = Math.sqrt(this.touch.move.x ** 2 + this.touch.move.y ** 2);
-                if (len > 1) {
-                    this.touch.move.x /= len;
-                    this.touch.move.y /= len;
-                }
-            }
-            
-            updateAimTouch(touch, pad) {
-                const rect = pad.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-                
-                this.touch.aim.x = (touch.clientX - centerX) / (rect.width / 2);
-                this.touch.aim.y = (touch.clientY - centerY) / (rect.height / 2);
-                
-                // Normalize vector
-                const len = Math.sqrt(this.touch.aim.x ** 2 + this.touch.aim.y ** 2);
-                if (len > 0) {
-                    this.touch.aim.x /= len;
-                    this.touch.aim.y /= len;
-                }
-            }
-            
-            spawnWave() {
-                const count = 3 + this.wave * 2;
-                const angleStep = (Math.PI * 2) / count;
-                const distance = 4 + this.wave * 0.5;
-                
-                for (let i = 0; i < count; i++) {
-                    const angle = angleStep * i + Math.random() * 0.2;
-                    
-                    this.enemies.push({
-                        x: Math.cos(angle) * distance,
-                        y: Math.sin(angle) * distance,
-                        health: 1 + Math.floor(this.wave / 3),
-                        speed: 0.7 + Math.random() * 0.3,
-                        size: 0.6 + Math.random() * 0.2,
-                        lastShot: 0,
-                        shootDelay: 2 + Math.random()
-                    });
-                }
-                
-                document.getElementById('wave').textContent = this.wave;
-            }
-            
-            update(deltaTime) {
-                this.gameTime += deltaTime;
-                
-                // Update player
-                if (this.touch.move.active) {
-                    const speed = 3 * deltaTime;
-                    this.player.x += this.touch.move.x * speed;
-                    this.player.y += this.touch.move.y * speed;
-                    
-                    // Keep player in bounds
-                    const bounds = 3;
-                    this.player.x = Math.max(-bounds, Math.min(bounds, this.player.x));
-                    this.player.y = Math.max(-bounds, Math.min(bounds, this.player.y));
-                }
-                
-                // Update weapons
-                const weapon = this.player.weapons[this.player.activeWeapon];
-                if (weapon.cooldown > 0) {
-                    weapon.cooldown -= deltaTime;
-                }
-                
-                // Fire weapon
-                if (this.touch.aim.active && weapon.cooldown <= 0) {
-                    this.fireWeapon();
-                    weapon.cooldown = weapon.maxCooldown;
-                }
-                
-                // Update bullets
-                for (let i = this.bullets.length - 1; i >= 0; i--) {
-                    const bullet = this.bullets[i];
-                    bullet.x += bullet.vx * deltaTime;
-                    bullet.y += bullet.vy * deltaTime;
-                    bullet.life -= deltaTime;
-                    
-                    // Remove out-of-bounds bullets
-                    if (Math.abs(bullet.x) > 10 || Math.abs(bullet.y) > 10 || bullet.life <= 0) {
-                        this.bullets.splice(i, 1);
-                        continue;
-                    }
-                    
-                    // Check enemy hits
-                    for (let j = this.enemies.length - 1; j >= 0; j--) {
-                        const enemy = this.enemies[j];
-                        const dx = bullet.x - enemy.x;
-                        const dy = bullet.y - enemy.y;
-                        const distSq = dx * dx + dy * dy;
-                        
-                        if (distSq < 0.4 * 0.4) { // Hit radius
-                            enemy.health--;
-                            this.bullets.splice(i, 1);
-                            
-                            // Hit effect
-                            this.engine.addParticle(
-                                enemy.x, enemy.y,
-                                bullet.vx * 0.5, bullet.vy * 0.5,
-                                [0, 1, 1],
-                                0.2, 0.3
-                            );
-                            
-                            if (enemy.health <= 0) {
-                                this.credits += 50 * this.wave;
-                                document.getElementById('credits').textContent = this.credits;
-                                this.enemies.splice(j, 1);
-                                
-                                // Explosion
-                                this.engine.createExplosion(
-                                    enemy.x, enemy.y,
-                                    [1, 0.5, 0.8],
-                                    30
-                                );
-                            }
-                            break;
-                        }
-                    }
-                }
-                
-                // Update enemies
-                for (const enemy of this.enemies) {
-                    // Move toward player
-                    const dx = this.player.x - enemy.x;
-                    const dy = this.player.y - enemy.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (dist > 0.8) { // Stop when close
-                        enemy.x += (dx / dist) * enemy.speed * deltaTime;
-                        enemy.y += (dy / dist) * enemy.speed * deltaTime;
-                    }
-                    
-                    // Enemy attacks
-                    enemy.lastShot += deltaTime;
-                    if (enemy.lastShot >= enemy.shootDelay && dist < 5) {
-                        this.enemyShoot(enemy);
-                        enemy.lastShot = 0;
-                    }
-                    
-                    // Collision with player
-                    if (dist < 0.7) {
-                        this.player.energy -= 10 * deltaTime;
-                        document.getElementById('energy').textContent = Math.floor(this.player.energy);
-                        
-                        if (this.player.energy <= 0) {
-                            this.gameOver();
-                            return;
-                        }
-                    }
-                }
-                
-                // Check wave completion
-                if (this.enemies.length === 0) {
-                    this.wave++;
-                    this.player.energy = Math.min(100, this.player.energy + 25);
-                    document.getElementById('energy').textContent = Math.floor(this.player.energy);
-                    this.spawnWave();
-                    
-                    // Upgrade weapon every 3 waves
-                    if (this.wave % 3 === 0 && this.player.weapons[0].level < 5) {
-                        this.player.weapons[0].level++;
-                        this.player.weapons[0].maxCooldown = Math.max(0.05, 0.2 - this.player.weapons[0].level * 0.03);
-                    }
-                }
-            }
-            
-            fireWeapon() {
-                const weapon = this.player.weapons[this.player.activeWeapon];
-                const angle = Math.atan2(this.touch.aim.y, this.touch.aim.x);
-                
-                // Base bullet
-                this.bullets.push({
-                    x: this.player.x,
-                    y: this.player.y,
-                    vx: Math.cos(angle) * 8,
-                    vy: Math.sin(angle) * 8,
-                    life: 1.5,
-                    damage: 1
-                });
-                
-                // Muzzle flash
-                for (let i = 0; i < 3; i++) {
-                    const spread = (Math.random() - 0.5) * 0.2;
-                    this.engine.addParticle(
-                        this.player.x, this.player.y,
-                        Math.cos(angle + spread) * 2,
-                        Math.sin(angle + spread) * 2,
-                        [0, 0.8, 1],
-                        0.1, 0.2
-                    );
-                }
-                
-                // Upgraded weapons get additional bullets
-                if (weapon.level >= 2) {
-                    const offset = weapon.level >= 4 ? 0.3 : 0.2;
-                    
-                    for (let i = 0; i < (weapon.level >= 3 ? 2 : 1); i++) {
-                        const sideAngle = angle + (i === 0 ? -offset : offset);
-                        this.bullets.push({
-                            x: this.player.x,
-                            y: this.player.y,
-                            vx: Math.cos(sideAngle) * 7,
-                            vy: Math.sin(sideAngle) * 7,
-                            life: 1.3,
-                            damage: 1
-                        });
-                    }
-                }
-            }
-            
-            enemyShoot(enemy) {
-                const dx = this.player.x - enemy.x;
-                const dy = this.player.y - enemy.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                const angle = Math.atan2(dy, dx);
-                
-                // Enemy bullet
-                this.bullets.push({
-                    x: enemy.x,
-                    y: enemy.y,
-                    vx: Math.cos(angle) * 5,
-                    vy: Math.sin(angle) * 5,
-                    life: 2,
-                    damage: 1,
-                    enemy: true
-                });
-                
-                // Muzzle effect
-                this.engine.addParticle(
-                    enemy.x, enemy.y,
-                    Math.cos(angle) * 1,
-                    Math.sin(angle) * 1,
-                    [1, 0.2, 0.5],
-                    0.15, 0.3,
-                    'enemy'
+            // Draw control pads (for debugging)
+            if (game.touch.move.active) {
+                ctx.strokeStyle = '#0f0';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(
+                    canvas.width/2, 
+                    canvas.height/2, 
+                    30, 0, Math.PI*2
                 );
-            }
-            
-            gameOver() {
-                alert(`SYSTEM FAILURE\nWave: ${this.wave}\nCredits: ${this.credits}`);
-                this.player.energy = 100;
-                this.credits = 0;
-                this.wave = 1;
-                this.enemies = [];
-                this.bullets = [];
-                document.getElementById('energy').textContent = this.player.energy;
-                document.getElementById('credits').textContent = this.credits;
-                document.getElementById('wave').textContent = this.wave;
-                this.spawnWave();
-            }
-            
-            getRenderObjects() {
-                const objects = [];
-                
-                // Player
-                objects.push({
-                    mesh: 'hexagon',
-                    texture: 'particle',
-                    position: [this.player.x, this.player.y],
-                    scale: [0.8, 0.8],
-                    color: [0, 0.8, 1],
-                    visible: true
-                });
-                
-                // Enemies
-                this.enemies.forEach(enemy => {
-                    objects.push({
-                        mesh: 'hexagon',
-                        texture: 'enemy',
-                        position: [enemy.x, enemy.y],
-                        scale: [enemy.size, enemy.size],
-                        color: [1, 0, 0.5],
-                        visible: true
-                    });
-                });
-                
-                // Bullets
-                this.bullets.forEach(bullet => {
-                    objects.push({
-                        mesh: 'quad',
-                        texture: bullet.enemy ? 'enemy' : 'bullet',
-                        position: [bullet.x, bullet.y],
-                        scale: [0.2, 0.2],
-                        color: bullet.enemy ? [1, 0.3, 0.6] : [1, 0.8, 0],
-                        visible: true
-                    });
-                });
-                
-                return objects;
-            }
-            
-            gameLoop() {
-                this.engine.update();
-                this.update(this.engine.deltaTime);
-                this.engine.render(this.getRenderObjects());
-                requestAnimationFrame(() => this.gameLoop());
+                ctx.stroke();
             }
         }
-
-        // Launch the cyber experience!
-        window.addEventListener('load', () => {
-            new NeonNexusGame();
-        });
+        
+        // Main game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Start the game
+        setupControls();
+        gameLoop();
+        
+        // Update UI
+        setInterval(() => {
+            document.getElementById('energy').textContent = game.energy;
+            document.getElementById('credits').textContent = game.credits;
+            document.getElementById('wave').textContent = game.wave;
+        }, 100);
     </script>
 </body>
 </html>
