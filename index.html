@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter - Smooth Controls</title>
+  <title>2.5D Shooter - Full Multitouch</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -14,8 +14,8 @@
       touch-action: none;
     }
     canvas {
-      width: 100vw !important;
-      height: 100vh !important;
+      width: 100vw;
+      height: 100vh;
       display: block;
     }
     #hud-gun {
@@ -28,15 +28,6 @@
       z-index: 10;
       transform: scale(1.05);
     }
-    #info {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      font-family: sans-serif;
-      font-size: 14px;
-      z-index: 10;
-    }
     .joystick {
       position: absolute;
       bottom: 20px;
@@ -45,14 +36,13 @@
       background: rgba(255, 255, 255, 0.05);
       border: 2px solid rgba(255, 255, 255, 0.2);
       border-radius: 50%;
-      z-index: 9999;
+      z-index: 1000;
     }
     #leftJoystick { left: 20px; }
     #rightJoystick { right: 20px; }
   </style>
 </head>
 <body>
-  <div id="info">Tap screen or click to shoot. WASD or Left Joystick to move.</div>
   <img id="hud-gun" src="assets/images/gun.png" alt="Gun" />
   <div id="leftJoystick" class="joystick"></div>
   <div id="rightJoystick" class="joystick"></div>
@@ -76,9 +66,16 @@
 
     const hudGun = document.getElementById("hud-gun");
     const gunFrames = [
-      "assets/images/frame1.png", "assets/images/frame2.png", "assets/images/frame3.png",
-      "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png"
+      "assets/images/frame1.png",
+      "assets/images/frame2.png",
+      "assets/images/frame3.png",
+      "assets/images/frame4.png",
+      "assets/images/frame5.png",
+      "assets/images/frame6.png"
     ];
+
+    let leftTouchId = null, rightTouchId = null;
+    let leftStart = null, rightStart = null;
 
     init();
     animate();
@@ -114,38 +111,50 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      document.addEventListener("click", () => {
-        shootBullet();
-        animateGun();
+      // --- Touch controls ---
+      document.addEventListener("touchstart", e => {
+        for (const touch of e.changedTouches) {
+          const x = touch.clientX;
+          if (x < window.innerWidth / 2 && leftTouchId === null) {
+            leftTouchId = touch.identifier;
+            leftStart = { x: touch.clientX, y: touch.clientY };
+          } else if (x >= window.innerWidth / 2 && rightTouchId === null) {
+            rightTouchId = touch.identifier;
+            rightStart = { x: touch.clientX, y: touch.clientY };
+          } else {
+            // Extra finger tap = shoot
+            shootBullet();
+            animateGun();
+          }
+        }
       });
 
-      // --- Joystick logic ---
-      const leftJoy = document.getElementById("leftJoystick");
-      const rightJoy = document.getElementById("rightJoystick");
-      let leftStart = null;
-      let rightStart = null;
-
-      leftJoy.addEventListener("touchstart", e => leftStart = e.touches[0]);
-      leftJoy.addEventListener("touchmove", e => {
-        const touch = e.touches[0];
-        const dx = touch.clientX - leftStart.clientX;
-        const dy = touch.clientY - leftStart.clientY;
-        targetX = dx * 0.02;
-        targetZ = dy * 0.02;
-      });
-      leftJoy.addEventListener("touchend", () => {
-        targetX = targetZ = 0;
+      document.addEventListener("touchmove", e => {
+        for (const touch of e.changedTouches) {
+          if (touch.identifier === leftTouchId && leftStart) {
+            const dx = touch.clientX - leftStart.x;
+            const dy = touch.clientY - leftStart.y;
+            targetX = dx * 0.02;
+            targetZ = dy * 0.02;
+          } else if (touch.identifier === rightTouchId && rightStart) {
+            const dx = touch.clientX - rightStart.x;
+            lookDelta = dx * 0.002;
+            rightStart = { x: touch.clientX, y: touch.clientY };
+          }
+        }
       });
 
-      rightJoy.addEventListener("touchstart", e => rightStart = e.touches[0]);
-      rightJoy.addEventListener("touchmove", e => {
-        const touch = e.touches[0];
-        const dx = touch.clientX - rightStart.clientX;
-        lookDelta = dx * 0.002;
-        rightStart = touch;
-      });
-      rightJoy.addEventListener("touchend", () => {
-        lookDelta = 0;
+      document.addEventListener("touchend", e => {
+        for (const touch of e.changedTouches) {
+          if (touch.identifier === leftTouchId) {
+            leftTouchId = null;
+            targetX = targetZ = 0;
+          }
+          if (touch.identifier === rightTouchId) {
+            rightTouchId = null;
+            lookDelta = 0;
+          }
+        }
       });
     }
 
@@ -197,10 +206,12 @@
       moveX += (targetX - moveX) * smoothing;
       moveZ += (targetZ - moveZ) * smoothing;
 
-      const moveVector = new THREE.Vector3(moveX, 0, moveZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
+      const moveVector = new THREE.Vector3(moveX, 0, moveZ)
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
       camera.position.add(moveVector);
 
       camera.rotation.y -= lookDelta;
+
       updateBullets();
       renderer.render(scene, camera);
     }
