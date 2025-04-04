@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Zombie Survival: Mobile Edition</title>
+  <title>Vertical Zombie Shooter</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      background: #111;
+      background: #000;
       overflow: hidden;
       font-family: sans-serif;
       user-select: none;
+      touch-action: none;
     }
     canvas {
       display: block;
-      background: linear-gradient(#444, #111);
-      touch-action: none;
+      background: #111;
     }
     #ui {
       position: absolute;
@@ -26,15 +26,32 @@
     }
     .joystick {
       position: absolute;
-      bottom: 10%;
-      width: 120px;
-      height: 120px;
+      width: 100px;
+      height: 100px;
       border-radius: 50%;
       background: rgba(255,255,255,0.1);
       pointer-events: auto;
     }
-    .joystick#left { left: 5%; }
-    .joystick#right { right: 5%; }
+    .joystick#left { bottom: 15%; left: 5%; }
+    .joystick#right { bottom: 15%; right: 5%; }
+
+    #rotatePrompt {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: #000;
+      color: white;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      z-index: 99;
+    }
+
+    @media screen and (orientation: landscape) {
+      #rotatePrompt { display: flex; }
+      canvas, #ui { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -43,45 +60,42 @@
     <div class="joystick" id="left"></div>
     <div class="joystick" id="right"></div>
   </div>
+  <div id="rotatePrompt">Please rotate your device to portrait mode</div>
+
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
-    let W = canvas.width = window.innerWidth;
-    let H = canvas.height = window.innerHeight;
+    let W, H;
 
-    window.addEventListener('resize', () => {
+    function resizeCanvas() {
       W = canvas.width = window.innerWidth;
       H = canvas.height = window.innerHeight;
-    });
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
     const player = {
-      x: W/2, y: H/2, r: 20,
+      x: W/2, y: H/1.5, r: 20,
       speed: 3,
       angle: 0,
       health: 100
     };
 
-    const zombies = [];
-    const bullets = [];
+    const zombies = [], bullets = [];
     let score = 0;
 
     function spawnZombie() {
-      const edge = Math.floor(Math.random() * 4);
-      let x, y;
-      if (edge === 0) { x = Math.random() * W; y = -30; }
-      else if (edge === 1) { x = W + 30; y = Math.random() * H; }
-      else if (edge === 2) { x = Math.random() * W; y = H + 30; }
-      else { x = -30; y = Math.random() * H; }
+      const x = Math.random() * W;
+      const y = -30;
       zombies.push({ x, y, r: 20, speed: 1 + Math.random() * 1.5 });
     }
 
     function shootBullet() {
-      const angle = player.angle;
       bullets.push({
-        x: player.x + Math.cos(angle)*25,
-        y: player.y + Math.sin(angle)*25,
-        angle,
-        speed: 8,
+        x: player.x,
+        y: player.y,
+        angle: player.angle,
+        speed: 8
       });
     }
 
@@ -175,7 +189,7 @@
       }
     }
 
-    setInterval(shootBullet, 500);
+    setInterval(shootBullet, 600);
 
     let touchX = null, touchY = null;
     document.getElementById('left').addEventListener('touchstart', e => {
@@ -193,6 +207,7 @@
         player.y += (dy / len) * player.speed;
       }
     });
+
     document.getElementById('right').addEventListener('touchmove', e => {
       const touch = e.touches[0];
       const dx = touch.clientX - player.x;
