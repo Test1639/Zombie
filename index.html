@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter with Joysticks</title>
+  <title>2.5D Shooter with Gun Animation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -71,9 +71,12 @@
 
     const hudGun = document.getElementById("hud-gun");
     const gunFrames = [
-      "assets/images/frame1.png", "assets/images/frame2.png", "assets/images/frame3.png",
-      "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png",
-      "assets/images/frame7.png", "assets/images/frame8.png"
+      "assets/images/frame1.png",
+      "assets/images/frame2.png",
+      "assets/images/frame3.png",
+      "assets/images/frame4.png",
+      "assets/images/frame5.png",
+      "assets/images/frame6.png"
     ];
 
     init();
@@ -128,69 +131,38 @@
         if (e.key === 'd') controls.right = false;
       });
 
-      // Multi-touch joystick support
-      let leftTouchId = null, rightTouchId = null;
-      let leftStart = null, rightStart = null;
-
+      let leftStart = null;
+      let rightStart = null;
       const leftJoy = document.getElementById("leftJoystick");
       const rightJoy = document.getElementById("rightJoystick");
 
       leftJoy.addEventListener("touchstart", e => {
-        for (const touch of e.changedTouches) {
-          if (leftTouchId === null) {
-            leftTouchId = touch.identifier;
-            leftStart = { x: touch.clientX, y: touch.clientY };
-          }
-        }
+        leftStart = e.touches[0];
       });
 
       leftJoy.addEventListener("touchmove", e => {
-        for (const touch of e.changedTouches) {
-          if (touch.identifier === leftTouchId) {
-            const dx = touch.clientX - leftStart.x;
-            const dy = touch.clientY - leftStart.y;
-            controls.forward = dy < -20;
-            controls.back = dy > 20;
-            controls.left = dx < -20;
-            controls.right = dx > 20;
-          }
-        }
+        const touch = e.touches[0];
+        const dx = touch.clientX - leftStart.clientX;
+        const dy = touch.clientY - leftStart.clientY;
+        controls.forward = dy < -20;
+        controls.back = dy > 20;
+        controls.left = dx < -20;
+        controls.right = dx > 20;
       });
 
-      leftJoy.addEventListener("touchend", e => {
-        for (const touch of e.changedTouches) {
-          if (touch.identifier === leftTouchId) {
-            controls.forward = controls.back = controls.left = controls.right = false;
-            leftTouchId = null;
-          }
-        }
+      leftJoy.addEventListener("touchend", () => {
+        controls.forward = controls.back = controls.left = controls.right = false;
       });
 
       rightJoy.addEventListener("touchstart", e => {
-        for (const touch of e.changedTouches) {
-          if (rightTouchId === null) {
-            rightTouchId = touch.identifier;
-            rightStart = { x: touch.clientX, y: touch.clientY };
-          }
-        }
+        rightStart = e.touches[0];
       });
 
       rightJoy.addEventListener("touchmove", e => {
-        for (const touch of e.changedTouches) {
-          if (touch.identifier === rightTouchId) {
-            const dx = touch.clientX - rightStart.x;
-            camera.rotation.y -= dx * 0.005;
-            rightStart = { x: touch.clientX, y: touch.clientY };
-          }
-        }
-      });
-
-      rightJoy.addEventListener("touchend", e => {
-        for (const touch of e.changedTouches) {
-          if (touch.identifier === rightTouchId) {
-            rightTouchId = null;
-          }
-        }
+        const touch = e.touches[0];
+        const dx = touch.clientX - rightStart.clientX;
+        camera.rotation.y -= dx * 0.005;
+        rightStart = touch;
       });
     }
 
@@ -245,6 +217,7 @@
       if (controls.right) dir.x += 0.1;
       dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
       camera.position.add(dir);
+
       updateBullets();
       renderer.render(scene, camera);
     }
