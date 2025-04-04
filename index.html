@@ -2,44 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mobile FPS with Dual Joysticks</title>
+  <title>2.5D Shooter Optimized</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
       height: 100%;
+      overflow: hidden;
       background: #000;
       touch-action: none;
       -webkit-user-select: none;
+      -webkit-touch-callout: none;
       user-select: none;
     }
     canvas {
-      width: 100vw !important;
-      height: 100vh !important;
       display: block;
+      width: 100vw;
+      height: 100vh;
     }
     #hud-gun {
       position: absolute;
       bottom: -10px;
       right: 40px;
       width: 340px;
-      height: auto;
       pointer-events: none;
       z-index: 10;
     }
     .joystick {
       position: absolute;
+      bottom: 20px;
       width: 120px;
       height: 120px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.2);
       border-radius: 50%;
-      z-index: 999;
+      z-index: 20;
     }
-    #leftJoystick { bottom: 20px; left: 20px; }
-    #rightJoystick { bottom: 20px; right: 20px; }
+    #leftJoystick { left: 20px; }
+    #rightJoystick { right: 20px; }
 
     #shootButton {
       position: absolute;
@@ -47,15 +48,15 @@
       right: 40px;
       width: 80px;
       height: 80px;
-      background: rgba(255, 0, 0, 0.8);
+      background: red;
       border-radius: 50%;
-      z-index: 1000;
-      touch-action: none;
+      z-index: 30;
+      opacity: 0.9;
     }
   </style>
 </head>
 <body>
-  <img id="hud-gun" src="assets/images/gun.png" />
+  <img id="hud-gun" src="assets/images/gun.png" alt="Gun HUD" />
   <div id="leftJoystick" class="joystick"></div>
   <div id="rightJoystick" class="joystick"></div>
   <div id="shootButton"></div>
@@ -64,10 +65,18 @@
   <script>
     let camera, scene, renderer;
     let controls = { forward: false, back: false, left: false, right: false };
+    const bullets = [];
+    const bulletSpeed = 1;
     let lastShotTime = 0;
-    const bullets = [], bulletSpeed = 1;
+    const fireDelay = 300;
     const bulletGeo = new THREE.SphereGeometry(0.08, 8, 8);
     const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+
+    const hudGun = document.getElementById("hud-gun");
+    const gunFrames = [
+      "assets/images/frame1.png", "assets/images/frame2.png", "assets/images/frame3.png",
+      "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png"
+    ];
 
     init();
     animate();
@@ -78,84 +87,112 @@
       camera.position.set(0, 1.6, 5);
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 100),
+        new THREE.MeshBasicMaterial({ color: 0x222222 })
+      );
       floor.rotation.x = -Math.PI / 2;
       scene.add(floor);
 
-      window.addEventListener('resize', () => {
+      // Touch controls
+      const leftJoy = document.getElementById("leftJoystick");
+      const rightJoy = document.getElementById("rightJoystick");
+      const shootBtn = document.getElementById("shootButton");
+
+      let leftStart = null;
+      let rightStart = null;
+      let lookDelta = 0;
+
+      leftJoy.addEventListener("touchstart", e => {
+        leftStart = e.touches[0];
+      });
+      leftJoy.addEventListener("touchmove", e => {
+        const touch = e.touches[0];
+        const dx = touch.clientX - leftStart.clientX;
+        const dy = touch.clientY - leftStart.clientY;
+        controls.forward = dy < -20;
+        controls.back = dy > 20;
+        controls.left = dx < -20;
+        controls.right = dx > 20;
+      });
+      leftJoy.addEventListener("touchend", () => {
+        controls = { forward: false, back: false, left: false, right: false };
+      });
+
+      rightJoy.addEventListener("touchstart", e => {
+        rightStart = e.touches[0];
+      });
+      rightJoy.addEventListener("touchmove", e => {
+        const touch = e.touches[0];
+        const dx = touch.clientX - rightStart.clientX;
+        camera.rotation.y -= dx * 0.005;
+        rightStart = touch;
+      });
+
+      shootBtn.addEventListener("touchstart", () => {
+        shootBullet();
+        animateGun();
+      });
+
+      window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
-
-      // shoot on tap
-      document.getElementById("shootButton").addEventListener("touchstart", e => {
-        e.preventDefault();
-        shootBullet();
-      });
-
-      // Joysticks
-      setupJoystick("leftJoystick", handleLeftJoystickMove);
-      setupJoystick("rightJoystick", handleRightJoystickMove);
     }
 
     function shootBullet() {
       const now = performance.now();
-      if (now - lastShotTime < 300) return;
+      if (now - lastShotTime < fireDelay) return;
       lastShotTime = now;
 
       const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-      bullet.position.copy(camera.position).add(new THREE.Vector3(0, -0.15, -0.5).applyQuaternion(camera.quaternion));
+      const offset = new THREE.Vector3(0, -0.15, -0.5).applyQuaternion(camera.quaternion);
+      bullet.position.copy(camera.position).add(offset);
       bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize().multiplyScalar(bulletSpeed);
-
       bullets.push(bullet);
       scene.add(bullet);
     }
 
+    function animateGun() {
+      let i = 0;
+      const delay = 50;
+      function next() {
+        if (i < gunFrames.length) {
+          hudGun.src = gunFrames[i];
+          i++;
+          setTimeout(next, delay);
+        } else {
+          hudGun.src = "assets/images/gun.png";
+        }
+      }
+      next();
+    }
+
     function updateBullets() {
       for (let i = bullets.length - 1; i >= 0; i--) {
-        bullets[i].position.add(bullets[i].velocity);
-        if (bullets[i].position.distanceTo(camera.position) > 50) {
-          scene.remove(bullets[i]);
+        const bullet = bullets[i];
+        bullet.position.add(bullet.velocity);
+        if (bullet.position.distanceTo(camera.position) > 50) {
+          scene.remove(bullet);
           bullets.splice(i, 1);
         }
       }
     }
 
-    function handleLeftJoystickMove(dx, dy) {
-      const dir = new THREE.Vector3();
-      if (dy < -20) dir.z -= 0.1;
-      if (dy > 20) dir.z += 0.1;
-      if (dx < -20) dir.x -= 0.1;
-      if (dx > 20) dir.x += 0.1;
-      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
-      camera.position.add(dir);
-    }
-
-    function handleRightJoystickMove(dx, dy) {
-      camera.rotation.y -= dx * 0.002;
-      camera.rotation.x = Math.max(-1.4, Math.min(1.4, camera.rotation.x - dy * 0.002));
-    }
-
-    function setupJoystick(id, onMove) {
-      const joy = document.getElementById(id);
-      let start = null;
-
-      joy.addEventListener("touchstart", e => start = e.touches[0]);
-      joy.addEventListener("touchmove", e => {
-        const dx = e.touches[0].clientX - start.clientX;
-        const dy = e.touches[0].clientY - start.clientY;
-        onMove(dx, dy);
-      });
-      joy.addEventListener("touchend", () => start = null);
-    }
-
     function animate() {
       requestAnimationFrame(animate);
+      const move = new THREE.Vector3();
+      if (controls.forward) move.z -= 0.1;
+      if (controls.back) move.z += 0.1;
+      if (controls.left) move.x -= 0.1;
+      if (controls.right) move.x += 0.1;
+      move.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
+      camera.position.add(move);
+
       updateBullets();
       renderer.render(scene, camera);
     }
