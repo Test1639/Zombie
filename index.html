@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter - Gun Animation</title>
+  <title>2.5D Shooter with Joysticks</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -11,7 +11,6 @@
       overflow: hidden;
       height: 100%;
       background: #000;
-      overscroll-behavior: none;
       touch-action: none;
     }
     canvas {
@@ -38,7 +37,7 @@
       font-size: 14px;
       z-index: 10;
     }
-    #leftJoystick, #rightJoystick {
+    .joystick {
       position: absolute;
       bottom: 20px;
       width: 120px;
@@ -47,17 +46,16 @@
       border: 2px solid rgba(255, 255, 255, 0.2);
       border-radius: 50%;
       z-index: 9999;
-      touch-action: none;
     }
     #leftJoystick { left: 20px; }
     #rightJoystick { right: 20px; }
   </style>
 </head>
 <body>
-  <div id="info">Click or tap to shoot. WASD to move.</div>
-  <img id="hud-gun" src="assets/images/gun.png" alt="Gun HUD" />
-  <div id="leftJoystick"></div>
-  <div id="rightJoystick"></div>
+  <div id="info">Tap screen or click to shoot. WASD or Left Joystick to move.</div>
+  <img id="hud-gun" src="assets/images/gun.png" alt="Gun" />
+  <div id="leftJoystick" class="joystick"></div>
+  <div id="rightJoystick" class="joystick"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
@@ -88,7 +86,7 @@
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setClearColor(0x000000, 1);
+      renderer.setClearColor(0x000000);
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
@@ -106,85 +104,65 @@
         scene.add(wall);
       }
 
-      const enemyTex = new THREE.TextureLoader().load('https://i.imgur.com/fYDOk8Y.png');
-      const enemyMat = new THREE.SpriteMaterial({ map: enemyTex });
-      for (let i = 0; i < 5; i++) {
-        const sprite = new THREE.Sprite(enemyMat);
-        sprite.position.set(Math.random() * 10 - 5, 1.5, -i * 10 - 5);
-        sprite.scale.set(1.5, 1.5, 1.5);
-        scene.add(sprite);
-      }
-
-      window.addEventListener('resize', () => {
+      window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      document.addEventListener('keydown', e => {
+      document.addEventListener("click", () => {
+        shootBullet();
+        animateGun();
+      });
+
+      document.addEventListener("keydown", e => {
         if (e.key === 'w') controls.forward = true;
         if (e.key === 's') controls.back = true;
         if (e.key === 'a') controls.left = true;
         if (e.key === 'd') controls.right = true;
       });
-      document.addEventListener('keyup', e => {
+      document.addEventListener("keyup", e => {
         if (e.key === 'w') controls.forward = false;
         if (e.key === 's') controls.back = false;
         if (e.key === 'a') controls.left = false;
         if (e.key === 'd') controls.right = false;
       });
 
-      document.addEventListener('mousemove', e => {
-        if (e.buttons === 1) {
-          camera.rotation.y -= e.movementX * 0.002;
-        }
+      // Joystick logic
+      let leftStart = null;
+      let rightStart = null;
+
+      const leftJoy = document.getElementById("leftJoystick");
+      const rightJoy = document.getElementById("rightJoystick");
+
+      leftJoy.addEventListener("touchstart", e => {
+        leftStart = e.touches[0];
       });
 
-      document.addEventListener('click', () => {
-        shootBullet();
-        playGunAnimation();
+      leftJoy.addEventListener("touchmove", e => {
+        const touch = e.touches[0];
+        const dx = touch.clientX - leftStart.clientX;
+        const dy = touch.clientY - leftStart.clientY;
+
+        controls.forward = dy < -20;
+        controls.back = dy > 20;
+        controls.left = dx < -20;
+        controls.right = dx > 20;
       });
 
-      // Touch Joysticks
-      let leftTouch = null, rightTouch = null;
-      let leftStart = null, rightStart = null;
-
-      document.getElementById("leftJoystick").addEventListener("touchstart", e => {
-        leftTouch = e.touches[0].identifier;
-        leftStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      });
-
-      document.getElementById("leftJoystick").addEventListener("touchmove", e => {
-        for (let t of e.touches) {
-          if (t.identifier === leftTouch) {
-            const dx = t.clientX - leftStart.x;
-            const dy = t.clientY - leftStart.y;
-            controls.forward = dy < -20;
-            controls.back = dy > 20;
-            controls.left = dx < -20;
-            controls.right = dx > 20;
-          }
-        }
-      });
-
-      document.getElementById("leftJoystick").addEventListener("touchend", () => {
+      leftJoy.addEventListener("touchend", () => {
         controls.forward = controls.back = controls.left = controls.right = false;
-        leftTouch = null;
       });
 
-      document.getElementById("rightJoystick").addEventListener("touchstart", e => {
-        rightTouch = e.touches[0].identifier;
-        rightStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      rightJoy.addEventListener("touchstart", e => {
+        rightStart = e.touches[0];
       });
 
-      document.getElementById("rightJoystick").addEventListener("touchmove", e => {
-        for (let t of e.touches) {
-          if (t.identifier === rightTouch) {
-            const dx = t.clientX - rightStart.x;
-            camera.rotation.y -= dx * 0.005;
-            rightStart = { x: t.clientX, y: t.clientY };
-          }
-        }
+      rightJoy.addEventListener("touchmove", e => {
+        const touch = e.touches[0];
+        const dx = touch.clientX - rightStart.clientX;
+        camera.rotation.y -= dx * 0.005;
+        rightStart = touch;
       });
     }
 
@@ -204,19 +182,19 @@
       scene.add(bullet);
     }
 
-    function playGunAnimation() {
-      let index = 0;
+    function animateGun() {
+      let i = 0;
       const delay = 50;
-      function nextFrame() {
-        if (index < gunFrames.length) {
-          hudGun.src = gunFrames[index];
-          index++;
-          setTimeout(nextFrame, delay);
+      function next() {
+        if (i < gunFrames.length) {
+          hudGun.src = gunFrames[i];
+          i++;
+          setTimeout(next, delay);
         } else {
           hudGun.src = "assets/images/gun.png";
         }
       }
-      nextFrame();
+      next();
     }
 
     function updateBullets() {
@@ -239,6 +217,7 @@
       if (controls.right) dir.x += 0.1;
       dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
       camera.position.add(dir);
+
       updateBullets();
       renderer.render(scene, camera);
     }
