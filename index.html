@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter - Full Multitouch</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>2.5D Shooter - Mobile Optimized</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <style>
     html, body {
       margin: 0;
@@ -60,18 +60,16 @@
     let targetX = 0, targetZ = 0;
     let lookDelta = 0;
     const smoothing = 0.1;
+    const moveSensitivity = 0.005;
+    const lookSensitivity = 0.002;
 
     const bulletGeo = new THREE.SphereGeometry(bulletSize, 8, 8);
     const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 
     const hudGun = document.getElementById("hud-gun");
     const gunFrames = [
-      "assets/images/frame1.png",
-      "assets/images/frame2.png",
-      "assets/images/frame3.png",
-      "assets/images/frame4.png",
-      "assets/images/frame5.png",
-      "assets/images/frame6.png"
+      "assets/images/frame1.png", "assets/images/frame2.png", "assets/images/frame3.png",
+      "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png"
     ];
 
     let leftTouchId = null, rightTouchId = null;
@@ -111,7 +109,6 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      // --- Touch controls ---
       document.addEventListener("touchstart", e => {
         for (const touch of e.changedTouches) {
           const x = touch.clientX;
@@ -122,7 +119,6 @@
             rightTouchId = touch.identifier;
             rightStart = { x: touch.clientX, y: touch.clientY };
           } else {
-            // Extra finger tap = shoot
             shootBullet();
             animateGun();
           }
@@ -134,11 +130,11 @@
           if (touch.identifier === leftTouchId && leftStart) {
             const dx = touch.clientX - leftStart.x;
             const dy = touch.clientY - leftStart.y;
-            targetX = dx * 0.02;
-            targetZ = dy * 0.02;
+            targetX = dx * moveSensitivity;
+            targetZ = dy * moveSensitivity;
           } else if (touch.identifier === rightTouchId && rightStart) {
             const dx = touch.clientX - rightStart.x;
-            lookDelta = dx * 0.002;
+            lookDelta = dx * lookSensitivity;
             rightStart = { x: touch.clientX, y: touch.clientY };
           }
         }
@@ -211,7 +207,6 @@
       camera.position.add(moveVector);
 
       camera.rotation.y -= lookDelta;
-
       updateBullets();
       renderer.render(scene, camera);
     }
