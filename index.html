@@ -48,7 +48,18 @@
       z-index: 9999;
     }
     #leftJoystick { left: 20px; }
-    #rightJoystick { right: 20px; }
+    #rightJoystick { right: 160px; }
+
+    #shootButton {
+      position: absolute;
+      bottom: 40px;
+      right: 20px;
+      width: 80px;
+      height: 80px;
+      background: red;
+      border-radius: 50%;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body>
@@ -56,6 +67,7 @@
   <img id="hud-gun" src="assets/images/gun.png" alt="Gun" />
   <div id="leftJoystick" class="joystick"></div>
   <div id="rightJoystick" class="joystick"></div>
+  <div id="shootButton"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
@@ -118,6 +130,12 @@
         animateGun();
       });
 
+      document.getElementById("shootButton").addEventListener("touchstart", e => {
+        e.preventDefault();
+        shootBullet();
+        animateGun();
+      });
+
       document.addEventListener("keydown", e => {
         if (e.key === 'w') controls.forward = true;
         if (e.key === 's') controls.back = true;
@@ -164,7 +182,10 @@
       rightJoy.addEventListener("touchmove", e => {
         const touch = e.touches[0];
         const dx = touch.clientX - rightStart.clientX;
+
+        // Only horizontal look
         camera.rotation.y -= dx * 0.005;
+
         rightStart = touch;
       });
     }
