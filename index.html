@@ -2,18 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Shooter</title>
+  <title>Mobile FPS Shooter</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
       overflow: hidden;
-      height: 100%;
       background: #000;
-      touch-action: none; /* Prevent double-tap zoom */
+      touch-action: none;
     }
     canvas {
+      width: 100vw;
+      height: 100vh;
       display: block;
     }
     #hud-gun {
@@ -21,38 +22,37 @@
       bottom: 0;
       left: 50%;
       transform: translateX(-50%);
-      width: auto;
-      height: 250px;
+      height: auto;
+      max-height: 100vh;
       pointer-events: none;
       z-index: 10;
     }
     .joystick {
       position: absolute;
-      bottom: 20px;
-      width: 120px;
-      height: 120px;
+      width: 140px;
+      height: 140px;
       background: rgba(255, 255, 255, 0.05);
       border: 2px solid rgba(255, 255, 255, 0.2);
       border-radius: 50%;
       z-index: 9999;
     }
-    #leftJoystick { left: 20px; }
-    #rightJoystick { right: 20px; }
+    #leftJoystick { bottom: 20px; left: 20px; }
+    #rightJoystick { bottom: 20px; right: 20px; }
     #shootButton {
       position: absolute;
-      bottom: 160px;
       right: 40px;
-      width: 80px;
-      height: 80px;
-      background: red;
+      bottom: 180px;
+      width: 100px;
+      height: 100px;
+      background: rgba(255, 0, 0, 0.8);
       border-radius: 50%;
       z-index: 10000;
-      touch-action: manipulation;
+      touch-action: none;
     }
   </style>
 </head>
 <body>
-  <img id="hud-gun" src="assets/images/gun.png" alt="Gun" />
+  <img id="hud-gun" src="assets/images/gun.png" />
   <div id="leftJoystick" class="joystick"></div>
   <div id="rightJoystick" class="joystick"></div>
   <div id="shootButton"></div>
@@ -60,23 +60,13 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
     let camera, scene, renderer;
-    let controls = { forward: false, back: false, left: false, right: false };
     const bullets = [];
-    const bulletSpeed = 1;
-    const bulletSize = 0.08;
-    let lastShotTime = 0;
-    const fireDelay = 300;
-    const bulletGeo = new THREE.SphereGeometry(bulletSize, 8, 8);
-    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-
+    const controls = { forward: false, back: false, left: false, right: false };
+    let moveX = 0, moveZ = 0, lookX = 0, lookY = 0;
+    let lastShot = 0;
+    const fireRate = 300;
+    const gunFrames = ["assets/images/frame1.png", "frame2.png", "frame3.png", "frame4.png", "frame5.png", "frame6.png"];
     const hudGun = document.getElementById("hud-gun");
-    const gunFrames = [
-      "assets/images/frame1.png", "assets/images/frame2.png", "assets/images/frame3.png",
-      "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png"
-    ];
-
-    let lookX = 0;
-    let lookY = 0;
 
     init();
     animate();
@@ -97,46 +87,42 @@
       floor.rotation.x = -Math.PI / 2;
       scene.add(floor);
 
-      const wallMat = new THREE.MeshBasicMaterial({ color: 0x4444aa });
+      // Target cubes
+      const cubeMat = new THREE.MeshBasicMaterial({ color: 0x4444aa });
       for (let i = 0; i < 20; i++) {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), wallMat);
-        wall.position.set(Math.random() * 20 - 10, 1, -i * 5);
-        scene.add(wall);
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), cubeMat);
+        cube.position.set(Math.random() * 20 - 10, 1, -i * 5);
+        scene.add(cube);
       }
 
-      // Fix resizing
       window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      // Disable double-tap zoom on iOS
-      document.addEventListener('touchstart', function(e) {
-        if (e.touches.length > 1) e.preventDefault();
-      }, { passive: false });
+      document.addEventListener("gesturestart", e => e.preventDefault());
 
       setupJoysticks();
-      document.getElementById("shootButton").addEventListener("touchstart", () => {
-        shootBullet();
-        animateGun();
-      });
+      setupShootButton();
     }
 
     function shootBullet() {
       const now = performance.now();
-      if (now - lastShotTime < fireDelay) return;
-      lastShotTime = now;
+      if (now - lastShot < fireRate) return;
+      lastShot = now;
 
+      const bulletGeo = new THREE.SphereGeometry(0.08, 8, 8);
+      const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
       const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-      const muzzleOffset = new THREE.Vector3(0, -0.15, -0.5).applyQuaternion(camera.quaternion);
-      bullet.position.copy(camera.position).add(muzzleOffset);
 
-      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-      bullet.velocity = direction.multiplyScalar(bulletSpeed);
-
+      const muzzle = new THREE.Vector3(0, -0.15, -0.5).applyQuaternion(camera.quaternion);
+      bullet.position.copy(camera.position).add(muzzle);
+      bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize().multiplyScalar(1);
       bullets.push(bullet);
       scene.add(bullet);
+
+      animateGun();
     }
 
     function animateGun() {
@@ -144,7 +130,7 @@
       const delay = 50;
       function next() {
         if (i < gunFrames.length) {
-          hudGun.src = gunFrames[i];
+          hudGun.src = "assets/images/" + gunFrames[i];
           i++;
           setTimeout(next, delay);
         } else {
@@ -156,72 +142,64 @@
 
     function updateBullets() {
       for (let i = bullets.length - 1; i >= 0; i--) {
-        const bullet = bullets[i];
-        bullet.position.add(bullet.velocity);
-        if (bullet.position.distanceTo(camera.position) > 50) {
-          scene.remove(bullet);
+        const b = bullets[i];
+        b.position.add(b.velocity);
+        if (b.position.distanceTo(camera.position) > 50) {
+          scene.remove(b);
           bullets.splice(i, 1);
         }
       }
     }
 
     function setupJoysticks() {
-      let leftStart = null;
-      let rightStart = null;
+      const left = document.getElementById("leftJoystick");
+      const right = document.getElementById("rightJoystick");
 
-      const leftJoy = document.getElementById("leftJoystick");
-      const rightJoy = document.getElementById("rightJoystick");
-
-      leftJoy.addEventListener("touchstart", e => {
-        leftStart = e.touches[0];
+      left.addEventListener("touchmove", e => {
+        const dx = e.touches[0].clientX - left.getBoundingClientRect().left - 70;
+        const dy = e.touches[0].clientY - left.getBoundingClientRect().top - 70;
+        moveX = dx / 70;
+        moveZ = dy / 70;
       });
 
-      leftJoy.addEventListener("touchmove", e => {
-        const touch = e.touches[0];
-        const dx = touch.clientX - leftStart.clientX;
-        const dy = touch.clientY - leftStart.clientY;
-
-        controls.forward = dy < -20;
-        controls.back = dy > 20;
-        controls.left = dx < -20;
-        controls.right = dx > 20;
+      left.addEventListener("touchend", () => {
+        moveX = 0;
+        moveZ = 0;
       });
 
-      leftJoy.addEventListener("touchend", () => {
-        controls.forward = controls.back = controls.left = controls.right = false;
+      right.addEventListener("touchmove", e => {
+        const dx = e.touches[0].clientX - right.getBoundingClientRect().left - 70;
+        const dy = e.touches[0].clientY - right.getBoundingClientRect().top - 70;
+        lookX = dx / 70;
+        lookY = dy / 70;
       });
 
-      rightJoy.addEventListener("touchstart", e => {
-        rightStart = e.touches[0];
+      right.addEventListener("touchend", () => {
+        lookX = 0;
+        lookY = 0;
       });
+    }
 
-      rightJoy.addEventListener("touchmove", e => {
-        const touch = e.touches[0];
-        const dx = touch.clientX - rightStart.clientX;
-        const dy = touch.clientY - rightStart.clientY;
-
-        lookX -= dx * 0.005;
-        lookY -= dy * 0.005;
-
-        lookY = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, lookY));
-        rightStart = touch;
+    function setupShootButton() {
+      document.getElementById("shootButton").addEventListener("touchstart", e => {
+        e.preventDefault();
+        shootBullet();
       });
     }
 
     function animate() {
       requestAnimationFrame(animate);
 
-      const dir = new THREE.Vector3();
-      if (controls.forward) dir.z -= 0.1;
-      if (controls.back) dir.z += 0.1;
-      if (controls.left) dir.x -= 0.1;
-      if (controls.right) dir.x += 0.1;
-      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), lookX);
+      // Apply movement
+      const dir = new THREE.Vector3(moveX * 0.1, 0, moveZ * 0.1);
+      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
       camera.position.add(dir);
 
-      camera.rotation.order = "YXZ";
-      camera.rotation.y = lookX;
-      camera.rotation.x = lookY;
+      // Apply look
+      camera.rotation.y -= lookX * 0.03;
+      camera.rotation.x -= lookY * 0.02;
+      camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+      camera.rotation.z = 0;
 
       updateBullets();
       renderer.render(scene, camera);
