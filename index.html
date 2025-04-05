@@ -2,19 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Zombie Shooter</title>
+  <title>Mobile FPS Game</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
       height: 100%;
       background: #000;
+      overflow: hidden;
       overscroll-behavior: none;
       touch-action: none;
-      -webkit-user-select: none;
-      user-select: none;
     }
     canvas {
       width: 100vw;
@@ -24,66 +22,65 @@
     }
     #hud-gun {
       position: absolute;
-      bottom: -10px;
-      right: 40px;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
       width: 340px;
-      height: auto;
       pointer-events: none;
-      z-index: 10;
+      z-index: 5;
     }
     .joystick {
       position: absolute;
-      width: 120px;
-      height: 120px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.2);
+      bottom: 20px;
+      width: 140px;
+      height: 140px;
       border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 2px solid rgba(255, 255, 255, 0.2);
       z-index: 10;
+      touch-action: none;
     }
-    #leftJoystick { bottom: 20px; left: 20px; }
-    #rightJoystick { bottom: 20px; right: 120px; }
-
-    #shootButton {
-      position: absolute;
+    #leftJoystick {
+      left: 20px;
+    }
+    #rightJoystick {
       right: 20px;
+    }
+    #shootBtn {
+      position: absolute;
+      right: 40px;
       bottom: 40px;
-      width: 80px;
-      height: 80px;
+      width: 100px;
+      height: 100px;
       background: red;
       border-radius: 50%;
-      z-index: 10;
+      opacity: 0.6;
+      z-index: 11;
       touch-action: none;
     }
   </style>
 </head>
 <body>
-  <img id="hud-gun" src="assets/images/gun.png" alt="Gun HUD" />
+  <img id="hud-gun" src="assets/images/gun.png" />
   <div id="leftJoystick" class="joystick"></div>
   <div id="rightJoystick" class="joystick"></div>
-  <div id="shootButton"></div>
+  <div id="shootBtn"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
-    let scene, camera, renderer;
+    let camera, scene, renderer;
     const bullets = [];
-    let lastShotTime = 0;
-    const fireDelay = 300;
     const bulletSpeed = 1;
     const bulletGeo = new THREE.SphereGeometry(0.08, 8, 8);
     const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-
-    const hudGun = document.getElementById("hud-gun");
-    const gunFrames = [
-      "assets/images/frame1.png",
-      "assets/images/frame2.png",
-      "assets/images/frame3.png",
-      "assets/images/frame4.png",
-      "assets/images/frame5.png",
-      "assets/images/frame6.png"
-    ];
-
     let moveVector = { x: 0, y: 0 };
     let lookVector = { x: 0, y: 0 };
+    let lastShot = 0;
+    const gunFrames = [
+      "assets/images/frame1.png", "assets/images/frame2.png", "assets/images/frame3.png",
+      "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png"
+    ];
+    const gun = document.getElementById("hud-gun");
 
     init();
     animate();
@@ -104,92 +101,102 @@
       floor.rotation.x = -Math.PI / 2;
       scene.add(floor);
 
-      const wallMat = new THREE.MeshBasicMaterial({ color: 0x4444aa });
+      // Dummy objects
+      const boxMat = new THREE.MeshBasicMaterial({ color: 0x4444aa });
       for (let i = 0; i < 10; i++) {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), wallMat);
-        wall.position.set(Math.random() * 20 - 10, 1, -i * 5);
-        scene.add(wall);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), boxMat);
+        box.position.set(Math.random() * 20 - 10, 1, -i * 5);
+        scene.add(box);
       }
 
-      // Resize handling
       window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      // SHOOT BUTTON
-      document.getElementById("shootButton").addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        shootBullet();
-        animateGun();
-      });
-
-      // JOYSTICK HANDLING
-      setupJoystick("leftJoystick", (dx, dy) => moveVector = { x: dx, y: dy });
-      setupJoystick("rightJoystick", (dx, dy) => lookVector = { x: dx, y: dy });
+      setupTouchControls();
     }
 
-    function shootBullet() {
+    function shoot() {
       const now = performance.now();
-      if (now - lastShotTime < fireDelay) return;
-      lastShotTime = now;
+      if (now - lastShot < 300) return;
+      lastShot = now;
 
       const bullet = new THREE.Mesh(bulletGeo, bulletMat);
       const muzzleOffset = new THREE.Vector3(0, -0.15, -0.5).applyQuaternion(camera.quaternion);
       bullet.position.copy(camera.position).add(muzzleOffset);
-
-      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-      bullet.velocity = direction.multiplyScalar(bulletSpeed);
-
+      bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(bulletSpeed);
       bullets.push(bullet);
       scene.add(bullet);
+      animateGun();
     }
 
     function animateGun() {
       let i = 0;
-      const delay = 50;
+      const delay = 40;
       function next() {
         if (i < gunFrames.length) {
-          hudGun.src = gunFrames[i];
+          gun.src = gunFrames[i];
           i++;
           setTimeout(next, delay);
         } else {
-          hudGun.src = "assets/images/gun.png";
+          gun.src = "assets/images/gun.png";
         }
       }
       next();
     }
 
-    function setupJoystick(id, callback) {
-      const el = document.getElementById(id);
-      let start = null;
-      el.addEventListener("touchstart", e => {
-        e.preventDefault();
-        start = e.touches[0];
-      }, { passive: false });
+    function setupTouchControls() {
+      let leftStart = null, rightStart = null;
+      const left = document.getElementById("leftJoystick");
+      const right = document.getElementById("rightJoystick");
+      const shootBtn = document.getElementById("shootBtn");
 
-      el.addEventListener("touchmove", e => {
-        e.preventDefault();
-        if (!start) return;
-        const dx = e.touches[0].clientX - start.clientX;
-        const dy = e.touches[0].clientY - start.clientY;
-        callback(dx / 60, dy / 60);
-      }, { passive: false });
+      left.addEventListener("touchstart", e => {
+        leftStart = e.touches[0];
+      });
+      left.addEventListener("touchmove", e => {
+        const touch = e.touches[0];
+        const dx = touch.clientX - leftStart.clientX;
+        const dy = touch.clientY - leftStart.clientY;
+        moveVector.x = dx / 40;
+        moveVector.y = dy / 40;
+      });
+      left.addEventListener("touchend", () => {
+        moveVector = { x: 0, y: 0 };
+      });
 
-      el.addEventListener("touchend", e => {
+      right.addEventListener("touchstart", e => {
+        rightStart = e.touches[0];
+      });
+      right.addEventListener("touchmove", e => {
+        const touch = e.touches[0];
+        const dx = touch.clientX - rightStart.clientX;
+        const dy = touch.clientY - rightStart.clientY;
+        lookVector.x = dx / 100;
+        lookVector.y = dy / 100;
+      });
+      right.addEventListener("touchend", () => {
+        lookVector = { x: 0, y: 0 };
+      });
+
+      shootBtn.addEventListener("touchstart", e => {
         e.preventDefault();
-        start = null;
-        callback(0, 0);
+        shoot();
+      });
+
+      // Prevent zooming on double-tap
+      document.addEventListener("touchstart", e => {
+        if (e.touches.length > 1) e.preventDefault();
       }, { passive: false });
     }
 
     function updateBullets() {
       for (let i = bullets.length - 1; i >= 0; i--) {
-        const bullet = bullets[i];
-        bullet.position.add(bullet.velocity);
-        if (bullet.position.distanceTo(camera.position) > 50) {
-          scene.remove(bullet);
+        bullets[i].position.add(bullets[i].velocity);
+        if (bullets[i].position.distanceTo(camera.position) > 50) {
+          scene.remove(bullets[i]);
           bullets.splice(i, 1);
         }
       }
@@ -198,28 +205,20 @@
     function animate() {
       requestAnimationFrame(animate);
 
-      // Move player
-      const dir = new THREE.Vector3(moveVector.x, 0, -moveVector.y);
-      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
-      camera.position.add(dir.multiplyScalar(0.1));
-
-      // Look direction
+      // Apply camera rotation (look)
       camera.rotation.y -= lookVector.x * 0.05;
       camera.rotation.x -= lookVector.y * 0.05;
-      camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x)); // Clamp vertical
+      camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+      camera.rotation.z = 0;
+
+      // Apply movement (moveVector.y = forward/back, x = left/right)
+      const dir = new THREE.Vector3(moveVector.x, 0, moveVector.y);
+      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
+      camera.position.add(dir.multiplyScalar(0.1));
 
       updateBullets();
       renderer.render(scene, camera);
     }
-
-    // BLOCK iOS DOUBLE TAP ZOOM & GESTURE ZOOM
-    document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
-    document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
-    document.addEventListener('gestureend', e => e.preventDefault(), { passive: false });
-    document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
-    document.addEventListener('touchstart', e => {
-      if (e.touches.length > 1) e.preventDefault();
-    }, { passive: false });
   </script>
 </body>
 </html>
