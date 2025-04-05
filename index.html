@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mobile FPS Demo</title>
+  <title>2.5D Shooter with Joysticks & Gun Animation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
@@ -14,16 +14,28 @@
       touch-action: none;
     }
     canvas {
+      width: 100vw !important;
+      height: 100vh !important;
       display: block;
     }
     #hud-gun {
       position: absolute;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 300px;
-      z-index: 10;
+      bottom: -10px;
+      right: 40px;
+      width: 340px;
+      height: auto;
       pointer-events: none;
+      z-index: 10;
+      transform: scale(1.05);
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 10;
     }
     .joystick {
       position: absolute;
@@ -33,30 +45,17 @@
       background: rgba(255, 255, 255, 0.05);
       border: 2px solid rgba(255, 255, 255, 0.2);
       border-radius: 50%;
-      z-index: 9;
+      z-index: 9999;
     }
     #leftJoystick { left: 20px; }
     #rightJoystick { right: 20px; }
-
-    #shootButton {
-      position: absolute;
-      right: 30px;
-      bottom: 160px;
-      width: 80px;
-      height: 80px;
-      background: red;
-      border-radius: 50%;
-      z-index: 10;
-      opacity: 0.85;
-      touch-action: none;
-    }
   </style>
 </head>
 <body>
+  <div id="info">Tap screen or click to shoot. WASD or Left Joystick to move.</div>
   <img id="hud-gun" src="assets/images/gun.png" alt="Gun" />
   <div id="leftJoystick" class="joystick"></div>
   <div id="rightJoystick" class="joystick"></div>
-  <div id="shootButton"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
@@ -70,6 +69,16 @@
     const bulletGeo = new THREE.SphereGeometry(bulletSize, 8, 8);
     const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 
+    const hudGun = document.getElementById("hud-gun");
+    const gunFrames = [
+      "assets/images/frame1.png",
+      "assets/images/frame2.png",
+      "assets/images/frame3.png",
+      "assets/images/frame4.png",
+      "assets/images/frame5.png",
+      "assets/images/frame6.png"
+    ];
+
     init();
     animate();
 
@@ -79,6 +88,8 @@
       camera.position.set(0, 1.6, 5);
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setClearColor(0x000000);
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
@@ -102,17 +113,11 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      // Disable double-tap zoom
-      document.addEventListener("touchstart", e => {
-        if (e.touches.length > 1) e.preventDefault();
-      }, { passive: false });
-
-      document.getElementById("shootButton").addEventListener("touchstart", e => {
-        e.preventDefault();
+      document.addEventListener("click", () => {
         shootBullet();
+        animateGun();
       });
 
-      // WASD fallback
       document.addEventListener("keydown", e => {
         if (e.key === 'w') controls.forward = true;
         if (e.key === 's') controls.back = true;
@@ -126,7 +131,7 @@
         if (e.key === 'd') controls.right = false;
       });
 
-      // Joystick logic
+      // Joystick movement
       let leftStart = null;
       let rightStart = null;
 
@@ -141,6 +146,7 @@
         const touch = e.touches[0];
         const dx = touch.clientX - leftStart.clientX;
         const dy = touch.clientY - leftStart.clientY;
+
         controls.forward = dy < -20;
         controls.back = dy > 20;
         controls.left = dx < -20;
@@ -158,14 +164,7 @@
       rightJoy.addEventListener("touchmove", e => {
         const touch = e.touches[0];
         const dx = touch.clientX - rightStart.clientX;
-        const dy = touch.clientY - rightStart.clientY;
         camera.rotation.y -= dx * 0.005;
-
-        // Clamp vertical look
-        camera.rotation.x -= dy * 0.005;
-        camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-        camera.rotation.z = 0;
-
         rightStart = touch;
       });
     }
@@ -186,6 +185,21 @@
       scene.add(bullet);
     }
 
+    function animateGun() {
+      let i = 0;
+      const delay = 60;
+      function next() {
+        if (i < gunFrames.length) {
+          hudGun.src = gunFrames[i];
+          i++;
+          setTimeout(next, delay);
+        } else {
+          hudGun.src = "assets/images/gun.png";
+        }
+      }
+      next();
+    }
+
     function updateBullets() {
       for (let i = bullets.length - 1; i >= 0; i--) {
         const bullet = bullets[i];
@@ -199,7 +213,6 @@
 
     function animate() {
       requestAnimationFrame(animate);
-
       const dir = new THREE.Vector3();
       if (controls.forward) dir.z -= 0.1;
       if (controls.back) dir.z += 0.1;
