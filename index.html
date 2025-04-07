@@ -72,6 +72,7 @@
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.3);
       pointer-events: none;
+      transition: transform 0.1s;
     }
     #crosshair {
       position: absolute;
@@ -113,9 +114,9 @@
   <script>
     let camera, scene, renderer;
     const bullets = [];
-    const bulletSpeed = 1.5; // Increased bullet speed
-    const bulletGeo = new THREE.SphereGeometry(0.08, 16, 16); // Smoother bullets
-    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xff5555 }); // Changed bullet color
+    const bulletSpeed = 1.5;
+    const bulletGeo = new THREE.SphereGeometry(0.08, 16, 16);
+    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xff5555 });
     let moveVector = { x: 0, y: 0 };
     let lookVector = { x: 0, y: 0 };
     let lastShot = 0;
@@ -130,7 +131,8 @@
       lookSensitivity: 0.03,
       moveSpeed: 0.15,
       joystickDeadzone: 0.2,
-      bulletLifetime: 1000 // ms
+      bulletLifetime: 1000,
+      maxPitch: Math.PI / 3 // Limit camera up/down rotation
     };
 
     init();
@@ -158,7 +160,7 @@
       scene.add(floor);
 
       // Improved walls with random colors
-      for (let i = 0; i < 15; i++) { // More walls
+      for (let i = 0; i < 15; i++) {
         const wallMat = new THREE.MeshBasicMaterial({ 
           color: Math.random() * 0xffffff 
         });
@@ -247,13 +249,26 @@
         e.preventDefault();
       }, { passive: false });
 
+      // Look joystick
+      lookJoystick.addEventListener('touchstart', (e) => {
+        if (lookTouchId !== null) return;
+        const touch = e.touches[0];
+        lookTouchId = touch.identifier;
+        const rect = lookJoystick.getBoundingClientRect();
+        lookStartPos = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+        e.preventDefault();
+      }, { passive: false });
+
       document.addEventListener('touchmove', (e) => {
-        // Movement joystick
+        // Process movement joystick
         if (moveTouchId !== null) {
-          const touch = Array.from(e.touches).find(t => t.identifier === moveTouchId);
-          if (touch) {
-            const dx = touch.clientX - moveStartPos.x;
-            const dy = touch.clientY - moveStartPos.y;
+          const moveTouch = Array.from(e.touches).find(t => t.identifier === moveTouchId);
+          if (moveTouch) {
+            const dx = moveTouch.clientX - moveStartPos.x;
+            const dy = moveTouch.clientY - moveStartPos.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             const maxDistance = 50;
             
@@ -271,17 +286,16 @@
             if (Math.abs(moveVector.y) < settings.joystickDeadzone) moveVector.y = 0;
             
             // Update joystick visual
-            const inner = moveJoystick.querySelector('.joystick-inner');
-            inner.style.transform = `translate(${moveVector.x * 30}px, ${moveVector.y * 30}px)`;
+            moveInner.style.transform = `translate(${moveVector.x * 30}px, ${moveVector.y * 30}px)`;
           }
         }
         
-        // Look joystick
+        // Process look joystick (separate from movement)
         if (lookTouchId !== null) {
-          const touch = Array.from(e.touches).find(t => t.identifier === lookTouchId);
-          if (touch) {
-            const dx = touch.clientX - lookStartPos.x;
-            const dy = touch.clientY - lookStartPos.y;
+          const lookTouch = Array.from(e.touches).find(t => t.identifier === lookTouchId);
+          if (lookTouch) {
+            const dx = lookTouch.clientX - lookStartPos.x;
+            const dy = lookTouch.clientY - lookStartPos.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             const maxDistance = 50;
             
@@ -299,8 +313,7 @@
             if (Math.abs(lookVector.y) < settings.joystickDeadzone) lookVector.y = 0;
             
             // Update joystick visual
-            const inner = lookJoystick.querySelector('.joystick-inner');
-            inner.style.transform = `translate(${lookVector.x * 30}px, ${lookVector.y * 30}px)`;
+            lookInner.style.transform = `translate(${lookVector.x * 30}px, ${lookVector.y * 30}px)`;
           }
         }
       }, { passive: false });
@@ -310,30 +323,15 @@
           if (touch.identifier === moveTouchId) {
             moveTouchId = null;
             moveVector = { x: 0, y: 0 };
-            const inner = moveJoystick.querySelector('.joystick-inner');
-            inner.style.transform = 'translate(0, 0)';
+            moveInner.style.transform = 'translate(0, 0)';
           }
           if (touch.identifier === lookTouchId) {
             lookTouchId = null;
             lookVector = { x: 0, y: 0 };
-            const inner = lookJoystick.querySelector('.joystick-inner');
-            inner.style.transform = 'translate(0, 0)';
+            lookInner.style.transform = 'translate(0, 0)';
           }
         }
       });
-
-      // Look joystick
-      lookJoystick.addEventListener('touchstart', (e) => {
-        if (lookTouchId !== null) return;
-        const touch = e.touches[0];
-        lookTouchId = touch.identifier;
-        const rect = lookJoystick.getBoundingClientRect();
-        lookStartPos = {
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2
-        };
-        e.preventDefault();
-      }, { passive: false });
 
       // Shoot button
       shootBtn.addEventListener("touchstart", (e) => {
@@ -362,13 +360,17 @@
     function animate() {
       requestAnimationFrame(animate);
 
-      // Look around with smoothing
+      // Look around with smoothing and limits
       camera.rotation.y -= lookVector.x * settings.lookSensitivity;
       camera.rotation.x -= lookVector.y * settings.lookSensitivity;
-      camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+      
+      // Limit vertical rotation to prevent flipping
+      camera.rotation.x = Math.max(-settings.maxPitch, Math.min(settings.maxPitch, camera.rotation.x));
+      
+      // Reset any z-rotation to prevent barrel rolls
       camera.rotation.z = 0;
 
-      // Move with smoothing
+      // Move - only affected by movement joystick
       const dir = new THREE.Vector3(moveVector.x, 0, moveVector.y);
       dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
       camera.position.add(dir.multiplyScalar(settings.moveSpeed));
