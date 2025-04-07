@@ -22,9 +22,19 @@
       position: absolute;
       bottom: -10px;
       right: 40px;
-      width: 300px;
+      width: 340px;
       height: auto;
       pointer-events: none;
+      z-index: 10;
+      transform: scale(1.05);
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 14px;
       z-index: 10;
     }
     .joystick {
@@ -38,24 +48,14 @@
       z-index: 9999;
     }
     #leftJoystick { left: 20px; }
-    #rightJoystick { right: 100px; }
-    #shootButton {
-      position: absolute;
-      bottom: 40px;
-      right: 20px;
-      width: 80px;
-      height: 80px;
-      background-color: red;
-      border-radius: 50%;
-      z-index: 9999;
-    }
+    #rightJoystick { right: 20px; }
   </style>
 </head>
 <body>
+  <div id="info">Tap screen or click to shoot. WASD or Left Joystick to move.</div>
   <img id="hud-gun" src="assets/images/gun.png" alt="Gun" />
   <div id="leftJoystick" class="joystick"></div>
   <div id="rightJoystick" class="joystick"></div>
-  <div id="shootButton"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
@@ -113,11 +113,6 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      document.getElementById("shootButton").addEventListener("touchstart", () => {
-        shootBullet();
-        animateGun();
-      });
-
       document.addEventListener("click", () => {
         shootBullet();
         animateGun();
@@ -136,6 +131,7 @@
         if (e.key === 'd') controls.right = false;
       });
 
+      // Joystick movement
       let leftStart = null;
       let rightStart = null;
 
@@ -150,6 +146,7 @@
         const touch = e.touches[0];
         const dx = touch.clientX - leftStart.clientX;
         const dy = touch.clientY - leftStart.clientY;
+
         controls.forward = dy < -20;
         controls.back = dy > 20;
         controls.left = dx < -20;
@@ -168,8 +165,6 @@
         const touch = e.touches[0];
         const dx = touch.clientX - rightStart.clientX;
         camera.rotation.y -= dx * 0.005;
-        camera.rotation.x = 0; // lock vertical pitch
-        camera.rotation.z = 0; // lock camera roll
         rightStart = touch;
       });
     }
@@ -225,6 +220,7 @@
       if (controls.right) dir.x += 0.1;
       dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
       camera.position.add(dir);
+
       updateBullets();
       renderer.render(scene, camera);
     }
