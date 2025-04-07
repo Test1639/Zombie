@@ -32,29 +32,90 @@
     }
     #shootBtn {
       position: absolute;
-      right: 55px;
+      left: 55px;
       bottom: 160px;
       width: 80px;
       height: 80px;
-      background: red;
+      background: rgba(255, 0, 0, 0.5);
       border-radius: 50%;
-      opacity: 0.7;
       z-index: 11;
       touch-action: none;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      transition: transform 0.1s;
+    }
+    #shootBtn:active {
+      transform: scale(0.9);
+      background: rgba(255, 0, 0, 0.7);
+    }
+    .joystick {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #moveJoystick {
+      left: 30px;
+      bottom: 30px;
+    }
+    #lookJoystick {
+      right: 30px;
+      bottom: 30px;
+    }
+    .joystick-inner {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      pointer-events: none;
+    }
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #crosshair:before, #crosshair:after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+    }
+    #crosshair:before {
+      width: 2px;
+      height: 20px;
+      left: 9px;
+      top: 0;
+    }
+    #crosshair:after {
+      width: 20px;
+      height: 2px;
+      left: 0;
+      top: 9px;
     }
   </style>
 </head>
 <body>
   <img id="hud-gun" src="assets/images/gun.png" />
+  <div id="crosshair"></div>
+  <div id="moveJoystick" class="joystick"><div class="joystick-inner"></div></div>
+  <div id="lookJoystick" class="joystick"><div class="joystick-inner"></div></div>
   <div id="shootBtn"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
   <script>
     let camera, scene, renderer;
     const bullets = [];
-    const bulletSpeed = 1;
-    const bulletGeo = new THREE.SphereGeometry(0.08, 8, 8);
-    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+    const bulletSpeed = 1.5; // Increased bullet speed
+    const bulletGeo = new THREE.SphereGeometry(0.08, 16, 16); // Smoother bullets
+    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xff5555 }); // Changed bullet color
     let moveVector = { x: 0, y: 0 };
     let lookVector = { x: 0, y: 0 };
     let lastShot = 0;
@@ -63,6 +124,14 @@
       "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png"
     ];
     const gun = document.getElementById("hud-gun");
+    
+    // Game settings
+    const settings = {
+      lookSensitivity: 0.03,
+      moveSpeed: 0.15,
+      joystickDeadzone: 0.2,
+      bulletLifetime: 1000 // ms
+    };
 
     init();
     animate();
@@ -76,19 +145,43 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
+      // Improved floor with grid
       const floor = new THREE.Mesh(
-        new THREE.PlaneGeometry(100, 100),
-        new THREE.MeshBasicMaterial({ color: 0x222222 })
+        new THREE.PlaneGeometry(100, 100, 20, 20),
+        new THREE.MeshBasicMaterial({ 
+          color: 0x222222,
+          wireframe: true,
+          wireframeLinewidth: 1
+        })
       );
       floor.rotation.x = -Math.PI / 2;
       scene.add(floor);
 
-      const wallMat = new THREE.MeshBasicMaterial({ color: 0x4444aa });
-      for (let i = 0; i < 10; i++) {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), wallMat);
-        wall.position.set(Math.random() * 20 - 10, 1, -i * 5);
+      // Improved walls with random colors
+      for (let i = 0; i < 15; i++) { // More walls
+        const wallMat = new THREE.MeshBasicMaterial({ 
+          color: Math.random() * 0xffffff 
+        });
+        const wall = new THREE.Mesh(
+          new THREE.BoxGeometry(1, 2, 1), 
+          wallMat
+        );
+        wall.position.set(
+          Math.random() * 30 - 15, 
+          1, 
+          -i * 3 - Math.random() * 10
+        );
         scene.add(wall);
       }
+
+      // Add a skybox
+      const skyGeo = new THREE.BoxGeometry(1000, 1000, 1000);
+      const skyMat = new THREE.MeshBasicMaterial({ 
+        color: 0x111133,
+        side: THREE.BackSide
+      });
+      const skybox = new THREE.Mesh(skyGeo, skyMat);
+      scene.add(skybox);
 
       window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -96,7 +189,7 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      setupTouchControls();
+      setupControls();
     }
 
     function shoot() {
@@ -108,6 +201,7 @@
       const muzzleOffset = new THREE.Vector3(0, -0.1, -0.8).applyQuaternion(camera.quaternion);
       bullet.position.copy(camera.position).add(muzzleOffset);
       bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(bulletSpeed);
+      bullet.birthTime = now;
       bullets.push(bullet);
       scene.add(bullet);
       animateGun();
@@ -128,60 +222,137 @@
       next();
     }
 
-    function setupTouchControls() {
+    function setupControls() {
       const shootBtn = document.getElementById("shootBtn");
+      const moveJoystick = document.getElementById("moveJoystick");
+      const lookJoystick = document.getElementById("lookJoystick");
+      const moveInner = moveJoystick.querySelector('.joystick-inner');
+      const lookInner = lookJoystick.querySelector('.joystick-inner');
 
-      let touchStart = {};
-      document.addEventListener("touchstart", e => {
-        for (let touch of e.touches) {
-          const isLeft = touch.clientX < window.innerWidth / 2;
-          touchStart[touch.identifier] = { x: touch.clientX, y: touch.clientY, isLeft };
-        }
-        if (e.touches.length > 1) e.preventDefault(); // prevent zoom
+      let moveTouchId = null;
+      let lookTouchId = null;
+      let moveStartPos = { x: 0, y: 0 };
+      let lookStartPos = { x: 0, y: 0 };
+
+      // Movement joystick
+      moveJoystick.addEventListener('touchstart', (e) => {
+        if (moveTouchId !== null) return;
+        const touch = e.touches[0];
+        moveTouchId = touch.identifier;
+        const rect = moveJoystick.getBoundingClientRect();
+        moveStartPos = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+        e.preventDefault();
       }, { passive: false });
 
-      document.addEventListener("touchmove", e => {
-        moveVector = { x: 0, y: 0 };
-        lookVector = { x: 0, y: 0 };
-
-        for (let touch of e.touches) {
-          const start = touchStart[touch.identifier];
-          if (!start) continue;
-
-          const dx = touch.clientX - start.x;
-          const dy = touch.clientY - start.y;
-
-          if (start.isLeft) {
-            moveVector.x = dx / 40;
-            moveVector.y = dy / 40;
-          } else {
-            lookVector.x = dx / 100;
-            lookVector.y = dy / 100;
+      document.addEventListener('touchmove', (e) => {
+        // Movement joystick
+        if (moveTouchId !== null) {
+          const touch = Array.from(e.touches).find(t => t.identifier === moveTouchId);
+          if (touch) {
+            const dx = touch.clientX - moveStartPos.x;
+            const dy = touch.clientY - moveStartPos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = 50;
+            
+            if (distance > maxDistance) {
+              const angle = Math.atan2(dy, dx);
+              moveVector.x = Math.cos(angle);
+              moveVector.y = Math.sin(angle);
+            } else {
+              moveVector.x = dx / maxDistance;
+              moveVector.y = dy / maxDistance;
+            }
+            
+            // Apply deadzone
+            if (Math.abs(moveVector.x) < settings.joystickDeadzone) moveVector.x = 0;
+            if (Math.abs(moveVector.y) < settings.joystickDeadzone) moveVector.y = 0;
+            
+            // Update joystick visual
+            const inner = moveJoystick.querySelector('.joystick-inner');
+            inner.style.transform = `translate(${moveVector.x * 30}px, ${moveVector.y * 30}px)`;
+          }
+        }
+        
+        // Look joystick
+        if (lookTouchId !== null) {
+          const touch = Array.from(e.touches).find(t => t.identifier === lookTouchId);
+          if (touch) {
+            const dx = touch.clientX - lookStartPos.x;
+            const dy = touch.clientY - lookStartPos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = 50;
+            
+            if (distance > maxDistance) {
+              const angle = Math.atan2(dy, dx);
+              lookVector.x = Math.cos(angle);
+              lookVector.y = Math.sin(angle);
+            } else {
+              lookVector.x = dx / maxDistance;
+              lookVector.y = dy / maxDistance;
+            }
+            
+            // Apply deadzone
+            if (Math.abs(lookVector.x) < settings.joystickDeadzone) lookVector.x = 0;
+            if (Math.abs(lookVector.y) < settings.joystickDeadzone) lookVector.y = 0;
+            
+            // Update joystick visual
+            const inner = lookJoystick.querySelector('.joystick-inner');
+            inner.style.transform = `translate(${lookVector.x * 30}px, ${lookVector.y * 30}px)`;
           }
         }
       }, { passive: false });
 
-      document.addEventListener("touchend", e => {
+      document.addEventListener('touchend', (e) => {
         for (let touch of e.changedTouches) {
-          delete touchStart[touch.identifier];
+          if (touch.identifier === moveTouchId) {
+            moveTouchId = null;
+            moveVector = { x: 0, y: 0 };
+            const inner = moveJoystick.querySelector('.joystick-inner');
+            inner.style.transform = 'translate(0, 0)';
+          }
+          if (touch.identifier === lookTouchId) {
+            lookTouchId = null;
+            lookVector = { x: 0, y: 0 };
+            const inner = lookJoystick.querySelector('.joystick-inner');
+            inner.style.transform = 'translate(0, 0)';
+          }
         }
-        moveVector = { x: 0, y: 0 };
-        lookVector = { x: 0, y: 0 };
       });
 
-      shootBtn.addEventListener("touchstart", e => {
+      // Look joystick
+      lookJoystick.addEventListener('touchstart', (e) => {
+        if (lookTouchId !== null) return;
+        const touch = e.touches[0];
+        lookTouchId = touch.identifier;
+        const rect = lookJoystick.getBoundingClientRect();
+        lookStartPos = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
         e.preventDefault();
+      }, { passive: false });
+
+      // Shoot button
+      shootBtn.addEventListener("touchstart", (e) => {
         shoot();
+        e.preventDefault();
       });
 
       // Block double-tap zoom
-      document.addEventListener("gesturestart", e => e.preventDefault(), { passive: false });
+      document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
     }
 
     function updateBullets() {
+      const now = performance.now();
       for (let i = bullets.length - 1; i >= 0; i--) {
         bullets[i].position.add(bullets[i].velocity);
-        if (bullets[i].position.distanceTo(camera.position) > 50) {
+        
+        // Remove bullets that are too far or too old
+        if (bullets[i].position.distanceTo(camera.position) > 50 || 
+            now - bullets[i].birthTime > settings.bulletLifetime) {
           scene.remove(bullets[i]);
           bullets.splice(i, 1);
         }
@@ -191,16 +362,16 @@
     function animate() {
       requestAnimationFrame(animate);
 
-      // Look around: constrain to X/Y only
-      camera.rotation.y -= lookVector.x * 0.05;
-      camera.rotation.x -= lookVector.y * 0.05;
+      // Look around with smoothing
+      camera.rotation.y -= lookVector.x * settings.lookSensitivity;
+      camera.rotation.x -= lookVector.y * settings.lookSensitivity;
       camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
       camera.rotation.z = 0;
 
-      // Move
+      // Move with smoothing
       const dir = new THREE.Vector3(moveVector.x, 0, moveVector.y);
       dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
-      camera.position.add(dir.multiplyScalar(0.1));
+      camera.position.add(dir.multiplyScalar(settings.moveSpeed));
 
       updateBullets();
       renderer.render(scene, camera);
