@@ -30,32 +30,15 @@
       pointer-events: none;
       z-index: 5;
     }
-    .joystick {
-      position: absolute;
-      bottom: 20px;
-      width: 140px;
-      height: 140px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.06);
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      z-index: 10;
-      touch-action: none;
-    }
-    #leftJoystick {
-      left: 20px;
-    }
-    #rightJoystick {
-      right: 20px;
-    }
     #shootBtn {
       position: absolute;
-      right: 40px;
-      bottom: 40px;
-      width: 100px;
-      height: 100px;
+      right: 55px;
+      bottom: 160px;
+      width: 80px;
+      height: 80px;
       background: red;
       border-radius: 50%;
-      opacity: 0.6;
+      opacity: 0.7;
       z-index: 11;
       touch-action: none;
     }
@@ -63,8 +46,6 @@
 </head>
 <body>
   <img id="hud-gun" src="assets/images/gun.png" />
-  <div id="leftJoystick" class="joystick"></div>
-  <div id="rightJoystick" class="joystick"></div>
   <div id="shootBtn"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
@@ -124,7 +105,7 @@
       lastShot = now;
 
       const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-      const muzzleOffset = new THREE.Vector3(0, -0.15, -0.5).applyQuaternion(camera.quaternion);
+      const muzzleOffset = new THREE.Vector3(0, -0.1, -0.8).applyQuaternion(camera.quaternion);
       bullet.position.copy(camera.position).add(muzzleOffset);
       bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(bulletSpeed);
       bullets.push(bullet);
@@ -148,36 +129,43 @@
     }
 
     function setupTouchControls() {
-      let leftStart = null, rightStart = null;
-      const left = document.getElementById("leftJoystick");
-      const right = document.getElementById("rightJoystick");
       const shootBtn = document.getElementById("shootBtn");
 
-      left.addEventListener("touchstart", e => {
-        leftStart = e.touches[0];
-      });
-      left.addEventListener("touchmove", e => {
-        const touch = e.touches[0];
-        const dx = touch.clientX - leftStart.clientX;
-        const dy = touch.clientY - leftStart.clientY;
-        moveVector.x = dx / 40;
-        moveVector.y = dy / 40;
-      });
-      left.addEventListener("touchend", () => {
-        moveVector = { x: 0, y: 0 };
-      });
+      let touchStart = {};
+      document.addEventListener("touchstart", e => {
+        for (let touch of e.touches) {
+          const isLeft = touch.clientX < window.innerWidth / 2;
+          touchStart[touch.identifier] = { x: touch.clientX, y: touch.clientY, isLeft };
+        }
+        if (e.touches.length > 1) e.preventDefault(); // prevent zoom
+      }, { passive: false });
 
-      right.addEventListener("touchstart", e => {
-        rightStart = e.touches[0];
-      });
-      right.addEventListener("touchmove", e => {
-        const touch = e.touches[0];
-        const dx = touch.clientX - rightStart.clientX;
-        const dy = touch.clientY - rightStart.clientY;
-        lookVector.x = dx / 100;
-        lookVector.y = dy / 100;
-      });
-      right.addEventListener("touchend", () => {
+      document.addEventListener("touchmove", e => {
+        moveVector = { x: 0, y: 0 };
+        lookVector = { x: 0, y: 0 };
+
+        for (let touch of e.touches) {
+          const start = touchStart[touch.identifier];
+          if (!start) continue;
+
+          const dx = touch.clientX - start.x;
+          const dy = touch.clientY - start.y;
+
+          if (start.isLeft) {
+            moveVector.x = dx / 40;
+            moveVector.y = dy / 40;
+          } else {
+            lookVector.x = dx / 100;
+            lookVector.y = dy / 100;
+          }
+        }
+      }, { passive: false });
+
+      document.addEventListener("touchend", e => {
+        for (let touch of e.changedTouches) {
+          delete touchStart[touch.identifier];
+        }
+        moveVector = { x: 0, y: 0 };
         lookVector = { x: 0, y: 0 };
       });
 
@@ -186,13 +174,8 @@
         shoot();
       });
 
-      // Block zoom on iOS
-      document.addEventListener("touchstart", e => {
-        if (e.touches.length > 1) e.preventDefault();
-      }, { passive: false });
+      // Block double-tap zoom
       document.addEventListener("gesturestart", e => e.preventDefault(), { passive: false });
-      document.addEventListener("gesturechange", e => e.preventDefault(), { passive: false });
-      document.addEventListener("gestureend", e => e.preventDefault(), { passive: false });
     }
 
     function updateBullets() {
@@ -208,13 +191,13 @@
     function animate() {
       requestAnimationFrame(animate);
 
-      // Look control (pan/tilt)
+      // Look around: constrain to X/Y only
       camera.rotation.y -= lookVector.x * 0.05;
       camera.rotation.x -= lookVector.y * 0.05;
       camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-      camera.rotation.z = 0; // Lock roll
+      camera.rotation.z = 0;
 
-      // Move based on joystick
+      // Move
       const dir = new THREE.Vector3(moveVector.x, 0, moveVector.y);
       dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
       camera.position.add(dir.multiplyScalar(0.1));
