@@ -125,7 +125,8 @@
       "assets/images/frame4.png", "assets/images/frame5.png", "assets/images/frame6.png"
     ];
     const gun = document.getElementById("hud-gun");
-    
+    const enemies = []; // Array to hold enemies
+
     // Game settings
     const settings = {
       lookSensitivity: 0.03,
@@ -147,43 +148,50 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
-      // Improved floor with grid
-      const floor = new THREE.Mesh(
-        new THREE.PlaneGeometry(100, 100, 20, 20),
-        new THREE.MeshBasicMaterial({ 
-          color: 0x222222,
-          wireframe: true,
-          wireframeLinewidth: 1
-        })
-      );
-      floor.rotation.x = -Math.PI / 2;
-      scene.add(floor);
+      const textureLoader = new THREE.TextureLoader();
 
-      // Improved walls with random colors
-      for (let i = 0; i < 15; i++) {
-        const wallMat = new THREE.MeshBasicMaterial({ 
-          color: Math.random() * 0xffffff 
-        });
-        const wall = new THREE.Mesh(
-          new THREE.BoxGeometry(1, 2, 1), 
-          wallMat
+      // Improved floor with texture
+      textureLoader.load('assets/images/floor_texture.png', (floorTexture) => {
+        floorTexture.wrapS = THREE.RepeatWrapping;
+        floorTexture.wrapT = THREE.RepeatWrapping;
+        floorTexture.repeat.set(10, 10);
+        const floor = new THREE.Mesh(
+          new THREE.PlaneGeometry(100, 100, 1, 1), // Reduced segments for performance on mobile
+          new THREE.MeshBasicMaterial({ map: floorTexture, side: THREE.DoubleSide })
         );
-        wall.position.set(
-          Math.random() * 30 - 15, 
-          1, 
-          -i * 3 - Math.random() * 10
-        );
-        scene.add(wall);
-      }
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+      });
+
+      // Improved walls with texture
+      textureLoader.load('assets/images/wall_texture.png', (wallTexture) => {
+        for (let i = 0; i < 15; i++) {
+          const wallMat = new THREE.MeshBasicMaterial({ map: wallTexture });
+          const wall = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 2, 1),
+            wallMat
+          );
+          wall.position.set(
+            Math.random() * 30 - 15,
+            1,
+            -i * 3 - Math.random() * 10
+          );
+          scene.add(wall);
+        }
+      });
 
       // Add a skybox
       const skyGeo = new THREE.BoxGeometry(1000, 1000, 1000);
-      const skyMat = new THREE.MeshBasicMaterial({ 
+      const skyMat = new THREE.MeshBasicMaterial({
         color: 0x111133,
         side: THREE.BackSide
       });
       const skybox = new THREE.Mesh(skyGeo, skyMat);
       scene.add(skybox);
+
+      // Spawn enemies (as sprites)
+      spawnEnemy(5, -10, 'assets/images/enemy1.png');
+      spawnEnemy(-8, -5, 'assets/images/enemy2.png'); // You'll need enemy images
 
       window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -192,6 +200,18 @@
       });
 
       setupControls();
+    }
+
+    function spawnEnemy(x, z, texturePath) {
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.load(texturePath, (enemyTexture) => {
+        const enemyMaterial = new THREE.SpriteMaterial({ map: enemyTexture });
+        const enemy = new THREE.Sprite(enemyMaterial);
+        enemy.scale.set(1, 2, 1); // Adjust size
+        enemy.position.set(x, 1, z);
+        scene.add(enemy);
+        enemies.push(enemy);
+      });
     }
 
     function shoot() {
@@ -271,7 +291,7 @@
             const dy = moveTouch.clientY - moveStartPos.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             const maxDistance = 50;
-            
+
             if (distance > maxDistance) {
               const angle = Math.atan2(dy, dx);
               moveVector.x = Math.cos(angle);
@@ -280,16 +300,16 @@
               moveVector.x = dx / maxDistance;
               moveVector.y = dy / maxDistance;
             }
-            
+
             // Apply deadzone
             if (Math.abs(moveVector.x) < settings.joystickDeadzone) moveVector.x = 0;
             if (Math.abs(moveVector.y) < settings.joystickDeadzone) moveVector.y = 0;
-            
+
             // Update joystick visual
             moveInner.style.transform = `translate(${moveVector.x * 30}px, ${moveVector.y * 30}px)`;
           }
         }
-        
+
         // Process look joystick (separate from movement)
         if (lookTouchId !== null) {
           const lookTouch = Array.from(e.touches).find(t => t.identifier === lookTouchId);
@@ -298,7 +318,7 @@
             const dy = lookTouch.clientY - lookStartPos.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             const maxDistance = 50;
-            
+
             if (distance > maxDistance) {
               const angle = Math.atan2(dy, dx);
               lookVector.x = Math.cos(angle);
@@ -307,11 +327,11 @@
               lookVector.x = dx / maxDistance;
               lookVector.y = dy / maxDistance;
             }
-            
+
             // Apply deadzone
             if (Math.abs(lookVector.x) < settings.joystickDeadzone) lookVector.x = 0;
             if (Math.abs(lookVector.y) < settings.joystickDeadzone) lookVector.y = 0;
-            
+
             // Update joystick visual
             lookInner.style.transform = `translate(${lookVector.x * 30}px, ${lookVector.y * 30}px)`;
           }
@@ -347,14 +367,20 @@
       const now = performance.now();
       for (let i = bullets.length - 1; i >= 0; i--) {
         bullets[i].position.add(bullets[i].velocity);
-        
+
         // Remove bullets that are too far or too old
-        if (bullets[i].position.distanceTo(camera.position) > 50 || 
+        if (bullets[i].position.distanceTo(camera.position) > 50 ||
             now - bullets[i].birthTime > settings.bulletLifetime) {
           scene.remove(bullets[i]);
           bullets.splice(i, 1);
         }
       }
+    }
+
+    function updateEnemies() {
+      enemies.forEach(enemy => {
+        enemy.lookAt(camera.position); // Make enemies always face the camera
+      });
     }
 
     function animate() {
@@ -363,10 +389,10 @@
       // Look around with smoothing and limits
       camera.rotation.y -= lookVector.x * settings.lookSensitivity;
       camera.rotation.x -= lookVector.y * settings.lookSensitivity;
-      
+
       // Limit vertical rotation to prevent flipping
       camera.rotation.x = Math.max(-settings.maxPitch, Math.min(settings.maxPitch, camera.rotation.x));
-      
+
       // Reset any z-rotation to prevent barrel rolls
       camera.rotation.z = 0;
 
@@ -376,8 +402,5 @@
       camera.position.add(dir.multiplyScalar(settings.moveSpeed));
 
       updateBullets();
-      renderer.render(scene, camera);
-    }
-  </script>
-</body>
-</html>
+      updateEnemies();
+      renderer.render(scene
